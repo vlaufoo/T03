@@ -302,7 +302,11 @@ begin
 --  ╚══════╝╚══════╝ ╚═════╝      ╚═════╝ ╚═════╝ ╚═╝     ╚═╝╚═════╝   --
 -------------------------------------------------------------------------
 
-  LSU_comb : process(all)
+  LSU_comb : process(
+                      RS1_Data_IE, RS2_Data_IE, LS_WB_EN, ls_instr_req, busy_LS_lat, add_out, state_LS, load_op, amo_load, 
+                      halt_LSU, data_width_ID, data_be_ID, decoded_instruction_LS, amo_store_lat, 
+                      amo_load_skip, data_rvalid_i, data_addr_internal_lat, store_op
+                    ) --VHDL1993
 
   variable data_addr_internal_wires         : std_logic_vector (31 downto 0);
   variable data_wdata_o_wires               : std_logic_vector (31 downto 0);
@@ -327,7 +331,7 @@ begin
     core_busy_LS_wires               := '0';
     busy_LS_wires                    := '0';
 
-    if ls_instr_req = '0' and busy_LS_lat = '0' then
+    if LS_instr_req = '0' and busy_LS_lat = '0' then
       LS_WB_EN_wire <= '0';
     elsif LS_instr_req = '1' or busy_LS_lat = '1' then
       LS_WB_EN_wire <= '0';
@@ -530,7 +534,7 @@ begin
             if load_op = '1'  or (decoded_instruction_LS(AMOSWAP_bit_position) = '1' and amo_store_lat = '0' and amo_load_skip = '0')  then
               data_be_internal_wires := data_be_ID;
               if decoded_instruction_LS(AMOSWAP_bit_position) = '1' then
-                core_busy_LS_wires := '1';				  
+                core_busy_LS_wires := '1';
               end if;
             end if;
           else
@@ -579,7 +583,9 @@ begin
   --  ╚═╝  ╚═╝╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝     ╚═════╝ ╚══════╝╚═╝  ╚═══╝  --
   -----------------------------------------------------------------------------------------------
 
-  LSU_Mapper_comb : process(all)
+  LSU_Mapper_comb : process(
+                            RS1_data_IE, instr_word_IE
+                           ) --VHDL1993
   begin
     add_op_A <= (others => '0');
     add_op_B <= (others => '0');

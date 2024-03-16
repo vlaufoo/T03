@@ -440,7 +440,7 @@ architecture Pipe of Pipeline is
     data_rdata_i               : in  std_logic_vector(31 downto 0);
     data_err_i                 : in  std_logic
   );
-  end component;  ------------------------------------------  
+  end component;  ------------------------------------------
 
   component IE_STAGE is
   generic(
@@ -1512,7 +1512,11 @@ begin
   ----------------------------------------------------------------------------------------------------
 
 
-  Tracer_Comb : process(all) -- also implements the delay slot counters and some aux signals
+  Tracer_Comb : process(
+                        state_IE, ie_instr_req, core_busy_IE_lat, irq_pending, decoded_instruction_IE, 
+                        instr_word_IE, RS1_Data_IE, RS2_Data_IE, decoded_instruction_IE, pc_IE
+                       ) --VHDL1993
+  -- also implements the delay slot counters and some aux signals
   begin
 
     IE_instr                        <= '0';
@@ -1526,7 +1530,7 @@ begin
       when normal =>
         if ie_instr_req = '0' and core_busy_IE_lat = '0' then
         elsif irq_pending(harc_EXEC) = '1' then
-        else-- process the instruction
+        else -- process the instruction
           IE_instr <= '1';
           -- TRACE IF EXECUTE INSTRUCTIONS ---------------------
 

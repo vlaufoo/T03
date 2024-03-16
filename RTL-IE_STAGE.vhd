@@ -498,7 +498,10 @@ begin
   --  ╚═╝╚══════╝     ╚═════╝ ╚═════╝ ╚═╝     ╚═╝╚═════╝   --
   -----------------------------------------------------------
 
-  fsm_IE_comb : process(all)
+  fsm_IE_comb : process(
+                        pc_IE, Immediate, RS1_Data_IE, instr_word_IE, absolute_address_int, harc_EXEC, WB_EN_next_IE, 
+                        instr_rvalid_IE, WB_EN_next_ID, decoded_instruction_IE, halt_update_IE_pending, instr_gnt_i, MHARTID
+                       ) --VHDL1993
 
     variable absolute_jump_wires              : std_logic_vector(harc_range);
     variable core_busy_IE_wires               : std_logic;
@@ -822,7 +825,7 @@ begin
     set_branch_condition       <= set_branch_condition_wires;
     served_irq                 <= served_irq_wires;
     ie_taken_branch            <= ie_taken_branch_wires;
-    set_mret_condition         <= set_mret_condition_wires;    
+    set_mret_condition         <= set_mret_condition_wires;
     set_wfi_condition          <= set_wfi_condition_wires;
     jump_instr                 <= jump_instr_wires;
     branch_instr               <= branch_instr_wires;
@@ -875,7 +878,10 @@ begin
   --  ╚═╝      ╚═════╝     ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝     ╚══════╝╚═╝  ╚═╝  --
   --------------------------------------------------------------------------------
 
-  IE_Mapper_comb : process(all)
+  IE_Mapper_comb : process(
+                            pass_BEQ, pass_BNE, pass_BLTU, pass_BGE, pass_BGEU, RS1_Data_IE, 
+                            RS2_Data_IE, instr_word_IE, decoded_instruction_IE, pc_IE
+                          ) --VHDL1993
   begin
     add_op_A    <= (others => '0');
     add_op_B    <= (others => '0');

@@ -286,7 +286,15 @@ begin
     end process;
 
 
-    pc_updater_comb : process(all)
+    pc_updater_comb : process(
+                              pc(h), taken_branch_pc_pending_internal_lat(h), taken_branch_pending_internal_lat(h), served_ie_except_condition_lat(h),
+                              served_ls_except_condition_lat(h), served_except_condition_lat(h), served_mret_condition_lat(h), reset_state(h),
+                              fetch_enable_i, MTVEC(h), instr_gnt_i, taken_branch_replicated(h), set_branch_condition_ID_replicated(h), branch_FETCH_replicated(h),
+                              set_wfi_condition, taken_branch_pending_internal(h), taken_branch_pending_internal_lat(h), irq_pending_internal(h),
+                              ie_except_condition_replicated(h), ls_except_condition_replicated(h), set_except_condition_replicated(h), set_mret_condition_replicated(h), 
+                              pc_wire(h), taken_branch_addr_internal(h), taken_branch_pc_pending_internal(h), taken_branch_pc_pending_internal_lat(h), 
+                              incremented_pc_internal(h), pc_update_enable(h)
+                             ) --VHDL1993
     begin
       pc_wire(h)                          <= pc(h);
       taken_branch_pc_pending_internal(h) <= taken_branch_pc_pending_internal_lat(h);

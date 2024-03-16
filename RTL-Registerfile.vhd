@@ -139,7 +139,10 @@ begin
 
   LATCH_REGFILE : if latch_rf = 1 generate
 
-  RF_WR_ACCESS : process(all)  -- synch single state process
+  RF_WR_ACCESS : process(
+                          WB_EN_lat, RF_res
+                        ) --VHDL1993
+  -- synch single state process
   begin
       for h in harc_range loop
         regfile(h)(0) <= (others => '0');
@@ -216,7 +219,11 @@ begin
 
   RF_LUTRAM : if lutram_rf = 1 generate
 
-  RF_RD_EN : process(all)  -- synch single state process
+  RF_RD_EN : process(
+                      core_busy_IE, core_busy_LS, ls_parallel_exec, instr_rvalid_ID_int, instr_word_ID, regfile_lutram_rs1,
+                      regfile_lutram_res2
+                    )  --VHDL1993
+  -- synch single state process
   begin
     RD_EN <= '0';
     if core_busy_IE = '1' or core_busy_LS = '1' or ls_parallel_exec = '0' then -- the instruction pipeline is halted
@@ -225,7 +232,7 @@ begin
       RD_EN <= '1';
     end if;  -- instr. conditions
     if rs1(instr_word_ID) /= 0 then
-      RS1_Data_IE_wire <= regfile_lutram_rs1(32*harc_ID+rs1(instr_word_ID)); 
+      RS1_Data_IE_wire <= regfile_lutram_rs1(32*harc_ID+rs1(instr_word_ID));
     else
       RS1_Data_IE_wire <= (others => '0');
     end if;

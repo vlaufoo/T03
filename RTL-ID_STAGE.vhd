@@ -595,7 +595,9 @@ begin
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 
   Superscalar_Enable : if superscalar_exec_en = 1 generate
-  fsm_ID_comb : process(all)
+  fsm_ID_comb : process(
+                        instr_word_ID, busy_LS, core_busy_IE, core_busy_LS, ls_parallel_exec, instr_rvalid_ID_int
+                       ) --VHDL1993
   variable OPCODE_wires  : std_logic_vector (6 downto 0);
   begin
     OPCODE_wires  := OPCODE(instr_word_ID); 
@@ -610,7 +612,9 @@ begin
   end generate;
 
   Superscalar_Disable: if superscalar_exec_en = 0 generate
-  fsm_ID_comb : process(all)
+  fsm_ID_comb : process(
+                        instr_word_ID, busy_LS, core_busy_LS, core_busy_IE, ls_parallel_exec, instr_rvalid_ID_int
+                       ) --VHDL 1993
   variable OPCODE_wires  : std_logic_vector (6 downto 0);
   begin
     OPCODE_wires      := OPCODE(instr_word_ID); 

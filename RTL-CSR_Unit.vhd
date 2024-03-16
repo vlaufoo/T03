@@ -168,7 +168,7 @@ architecture CSR of CSR_Unit is
 
 begin
 
-  process(all)
+  process(sw_irq) --VHDL1993
   begin
     sw_irq_int <= sw_irq(THREAD_POOL_SIZE-1 downto 0);
   end process;
@@ -1134,7 +1134,7 @@ begin
   -- end of replicated logic ------------------------------------------------------------
 
 --here we OR the signals coming from different CS logic replicas
-  process(all)
+  process(csr_instr_done_replicated(h), csr_access_denied_o_replicated(h)) --VHDL1993
     variable wire1, wire2 : std_logic;
   begin
     wire1 := '0'; wire2 := '0';
