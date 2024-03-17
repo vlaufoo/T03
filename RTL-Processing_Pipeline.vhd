@@ -1513,8 +1513,9 @@ begin
 
 
   Tracer_Comb : process(
-                        state_IE, ie_instr_req, core_busy_IE_lat, irq_pending, decoded_instruction_IE, 
-                        instr_word_IE, RS1_Data_IE, RS2_Data_IE, decoded_instruction_IE, pc_IE
+                        state_IE, IE_instr_req, core_busy_IE_lat, irq_pending, decoded_instruction_IE, 
+                        instr_word_IE, RS1_Data_IE, RS2_Data_IE, pc_IE, LS_instr_req, state_LS, 
+                        decoded_instruction_LS
                        ) --VHDL1993
   -- also implements the delay slot counters and some aux signals
   begin
@@ -1862,7 +1863,12 @@ begin
 
   EXEC_instr <= IE_instr or LSU_instr;
 
-  Dependency_checker : process(all) -- also implements the delay slot counters and some aux signals
+  Dependency_checker : process(
+                                RAW, Instr_word_buf, pc_buf, rs1_valid_buf, rs2_valid_buf, 
+                                rd_read_only_valid_buf, rd_valid_buf, buf_wr_ptr_lat,
+                                PCER, harc_EXEC_lat, EXEC_Instr_lat, rs1_chk_en, buf_wr_ptr_lat
+                              ) --VHDL1993
+  -- also implements the delay slot counters and some aux signals
   begin
     rs1_chk_en                  <= '0';
     rs2_chk_en                  <= '0';
