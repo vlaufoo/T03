@@ -229,6 +229,11 @@ architecture Klessydra_M of klessydra_m_core is
   signal harc_IF         : harc_range;
   signal harc_ID         : harc_range;
 
+
+  -- Internal signals (VHDL1993)
+  signal data_we_o_int                  : std_logic;
+  signal data_req_o_int                 : std_logic;
+
   function and_const(a: natural; b: natural) return natural is
     variable c : natural;
   begin
@@ -473,13 +478,17 @@ architecture Klessydra_M of klessydra_m_core is
 ----------------------- ARCHITECTURE BEGIN -------------------------------------------------------              
 begin
 
+  -- Connecting signals to ports
+  data_we_o <= data_we_o_int;
+  data_req_o <= data_req_o_int;
+
   sw_irq_o <= sw_irq;
 
   assert (lutram_rf /= debug_en and lutram_rf /= 1) report "Debug-Unit cannot read from a LUTRAM regfile." severity WARNING;
 
   instr_addr_o <= pc_IF;
 
-  process(all)
+  process(pc_except_value, set_except_condition, pc_IE) --VHDL1993
   begin
     pc_except_value_wire <= pc_except_value;
     if set_except_condition  = '1' then
@@ -594,8 +603,8 @@ begin
       core_id_i                   => core_id_i,
       instr_rvalid_i              => instr_rvalid_i,
       instr_rvalid_IE             => instr_rvalid_IE,
-      data_we_o                   => data_we_o,
-      data_req_o                  => data_req_o,
+      data_we_o                   => data_we_o_int,
+      data_req_o                  => data_req_o_int,
       data_gnt_i                  => data_gnt_i,
       irq_i                       => irq_i,
       irq_id_i                    => irq_id_i,
@@ -678,10 +687,10 @@ begin
       instr_gnt_i                => instr_gnt_i,
       instr_rvalid_i             => instr_rvalid_i,
       instr_rdata_i              => instr_rdata_i,
-      data_req_o                 => data_req_o,
+      data_req_o                 => data_req_o_int,
       data_gnt_i                 => data_gnt_i,
       data_rvalid_i              => data_rvalid_i,
-      data_we_o                  => data_we_o,
+      data_we_o                  => data_we_o_int,
       data_be_o                  => data_be_o,
       data_addr_o                => data_addr_o,
       data_wdata_o               => data_wdata_o,

@@ -181,6 +181,15 @@ architecture EXECUTE of IE_STAGE is
   signal halt_update_IE_wire        : std_logic_vector(harc_range);
   signal halt_update_IE_pending     : std_logic_vector(harc_range);
 
+  -- Internal signals (VHDL1993)
+  signal state_IE_int                      : fsm_ie_states;
+  signal branch_instr_int                  : std_logic;
+  signal jump_instr_int                    : std_logic;
+  signal IE_WB_EN_wire_int                 : std_logic;
+  signal MUL_WB_EN_wire_int                : std_logic;
+  signal core_busy_IE_int                  : std_logic;
+
+
   function rs1 (signal instr : in std_logic_vector(31 downto 0)) return integer is
   begin
     return to_integer(unsigned(instr(15+(RF_CEIL-1) downto 15)));
@@ -199,6 +208,12 @@ architecture EXECUTE of IE_STAGE is
 begin
 
   sw_irq  <= sw_irq_int and sw_irq_en;
+  state_IE <= state_IE_int;
+  branch_instr <= branch_instr_int;
+  jump_instr <= jump_instr_int;
+  IE_WB_EN_wire <= IE_WB_EN_wire_int;
+  MUL_WB_EN_wire <= MUL_WB_EN_wire_int;
+  core_busy_IE <= core_busy_IE_int;
 
   instr_rvalid_IE_int <= (instr_rvalid_IE or core_busy_IE_lat); -- AAA in case of non-hetergenous cluster, maybe a dual core for example, the core_enable_i should not flush the IE istruction.
 
@@ -227,7 +242,7 @@ begin
       IE_WB_EN         <= '0';
       MUL_WB_EN        <= '0';
       WB_EN_next_IE    <= '0';
-      core_busy_IE_lat <= core_busy_IE;
+      core_busy_IE_lat <= core_busy_IE_int;
       -- Branch miss handling ---------------------------------------------
       if instr_gnt_i = '1' then
         halt_update_IE <= halt_update_IE_wire or halt_update_IE_pending;
@@ -236,7 +251,7 @@ begin
         halt_update_IE_pending <= halt_update_IE_wire; -- AAA maybe make the wire into a single wire istead of harc_range
       end if; 
 
-      case state_IE is  -- stage state
+      case state_IE_int is  -- stage state
         when sleep =>
           null;
         when normal =>
@@ -253,8 +268,8 @@ begin
             -- for simplicity presently only harc 0 is interrupted (decided in program counter unit)
             -- the current valid instruction is discarded, only its pc value gets used for mepc
           else
-            IE_WB_EN           <= IE_WB_EN_wire;
-            MUL_WB_EN          <= MUL_WB_EN_wire;
+            IE_WB_EN           <= IE_WB_EN_wire_int;
+            MUL_WB_EN          <= MUL_WB_EN_wire_int;
             pc_WB              <= pc_IE;
             instr_word_IE_WB   <= instr_word_IE;
             harc_IE_WB         <= harc_EXEC;
@@ -380,7 +395,7 @@ begin
                   when others =>
                     null;
                 end case;
-                if core_busy_IE = '0' then
+                if core_busy_IE_int = '0' then
                   IE_WB  <= MUL(63 downto 32);
                 end if;
               end if;
@@ -472,7 +487,7 @@ begin
         when csr_instr_wait_state =>
           if (csr_instr_done = '1' and csr_access_denied_o = '0') then
             if zero_rd = '0' then
-              IE_WB_EN <= IE_WB_EN_wire;
+              IE_WB_EN <= IE_WB_EN_wire_int;
               IE_WB <= csr_rdata_o;
             end if;
           elsif (csr_instr_done = '1' and csr_access_denied_o = '1') then  -- ILLEGAL_INSTRUCTION
@@ -545,14 +560,14 @@ begin
     csr_instr_req                    <= '0';
     csr_op_i                         <= (others => '0');
     csr_addr_i                       <= (others => '0');
-    IE_WB_EN_wire                    <= (WB_EN_next_IE or (instr_rvalid_IE and WB_EN_next_ID  and not decoded_instruction_IE(MUL_bit_position))) and not served_irq_wires(harc_EXEC);
+    IE_WB_EN_wire_int                <= (WB_EN_next_IE or (instr_rvalid_IE and WB_EN_next_ID  and not decoded_instruction_IE(MUL_bit_position))) and not served_irq_wires(harc_EXEC);
     --branch prediction signals
     halt_update_IE_wire              <= halt_update_IE_pending and not instr_gnt_i; -- latch the halt wire as long as we don't have a valid instr
     branch_taken                     <= '0';
     source_hartid_o                  <= to_integer(unsigned(MHARTID(harc_EXEC)(THREAD_POOL_SIZE_GLOBAL-1 downto 0)));
 
     if RV32M = 1 then
-      MUL_WB_EN_wire                 <= WB_EN_next_ID and decoded_instruction_IE(MUL_bit_position) and not served_irq_wires(harc_EXEC);
+      MUL_WB_EN_wire_int                 <= WB_EN_next_ID and decoded_instruction_IE(MUL_bit_position) and not served_irq_wires(harc_EXEC);
       RS1_Data_IE_int_wire           <= RS1_Data_IE_int;
       RS2_Data_IE_int_wire           <= RS2_Data_IE_int;
       partial_mulh_a_wire            <= (others => '0');
@@ -573,7 +588,7 @@ begin
       nextstate_div                  <= init;
     end if;
 
-    case state_IE is                  -- stage status
+    case state_IE_int is                  -- stage status
       when sleep =>
         if irq_i = '1' or irq_pending(harc_EXEC) = '1' then
           nextstate_IE_wires             := normal;
@@ -820,15 +835,15 @@ begin
     end case;  -- fsm_IE state cases
 
     absolute_jump              <= absolute_jump_wires;
-    core_busy_IE               <= core_busy_IE_wires;
+    core_busy_IE_int               <= core_busy_IE_wires;
     IE_except_condition        <= IE_except_condition_wires;
     set_branch_condition       <= set_branch_condition_wires;
     served_irq                 <= served_irq_wires;
     ie_taken_branch            <= ie_taken_branch_wires;
     set_mret_condition         <= set_mret_condition_wires;
     set_wfi_condition          <= set_wfi_condition_wires;
-    jump_instr                 <= jump_instr_wires;
-    branch_instr               <= branch_instr_wires;
+    jump_instr_int                 <= jump_instr_wires;
+    branch_instr_int               <= branch_instr_wires;
     ebreak_instr               <= ebreak_instr_wires;
     nextstate_IE               <= nextstate_IE_wires;
     WFI_Instr                  <= WFI_Instr_wires;
@@ -840,16 +855,16 @@ begin
     if rst_ni = '0' then
       branch_instr_lat   <= '0'; 
       jump_instr_lat     <= '0';
-      state_IE           <= sleep;
+      state_IE_int           <= sleep;
       if RV32M = 1 then 
         state_mulh       <= init;
         state_mul        <= mult;
         state_div        <= init;
       end if;
     elsif rising_edge(clk_i) then
-      branch_instr_lat       <= branch_instr;
-      jump_instr_lat         <= jump_instr;
-      state_IE               <= nextstate_IE;
+      branch_instr_lat       <= branch_instr_int;
+      jump_instr_lat         <= jump_instr_int;
+      state_IE_int               <= nextstate_IE;
       if RV32M = 1 then
         state_mulh           <= nextstate_mulh;
         state_mul            <= nextstate_mul;

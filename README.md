@@ -6,3 +6,7 @@ Changes made to the description of the core, to adapt it to the 1993 standard, w
 - Reassignment of output ports to internal signals.
 - Rewriting of processes' sensitivitylists, since they do not support the keyword 'all' in 1993 VHDL.
 
+### Redefinition of array types
+A subtype cannot be defined as it is being used in the definition of a port, in the 1993 standard of VHDL.
+In order to use the array types implemented to replicate harc units and to create the register file, the subtype corresponding to each of these applications has to be defined before the subtype is used in an entity.
+The easiest way is implemented inthis branch, redefining subtypes for all applications in the klessydra package directly.

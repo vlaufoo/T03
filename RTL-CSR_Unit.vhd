@@ -151,6 +151,11 @@ architecture CSR of CSR_Unit is
 
   signal sw_irq_int                      : std_logic_vector(harc_range);
 
+  -- Internal signals (VHDL1993)
+
+  signal PCER_int               : array_2d(THREAD_POOL_SIZE-1 downto 0)(31 downto 0);
+  signal MHARTID_int            : array_2d(THREAD_POOL_SIZE-1 downto 0)(9 downto 0); 
+
   function rs1 (signal instr : in std_logic_vector(31 downto 0)) return integer is
   begin
     return to_integer(unsigned(instr(15+(RF_CEIL-1) downto 15)));
@@ -167,6 +172,10 @@ architecture CSR of CSR_Unit is
   end;
 
 begin
+
+  -- Connecting internal signal to ports (VHDL1993)
+  PCER <= PCER_int;
+  MHARTID <= MHARTID_int;
 
   process(sw_irq) --VHDL1993
   begin
@@ -229,7 +238,7 @@ begin
           MHPMEVENT10(h)                    <= PCER_RESET_VALUE(9);
         end if;
         if (MHPMCOUNTER_EN = 1 or MCYCLE_EN = 1 or MINSTRET_EN = 1) then
-          PCER(h)                           <= PCER_RESET_VALUE;
+          PCER_int(h)                           <= PCER_RESET_VALUE;
         end if;
         MIP_internal(h)                     <= MIP_RESET_VALUE;
         served_ie_except_condition_lat(h)   <= '0'; 
@@ -240,7 +249,7 @@ begin
         csr_rdata_o_replicated(h)           <= (others => '0');
 
       elsif rising_edge(clk_i) then
-        MHARTID(h) <= std_logic_vector(resize(unsigned(core_id_i) * (THREAD_POOL_SIZE_GLOBAL- THREAD_POOL_SIZE)  + to_unsigned(h, THREAD_ID_SIZE), 10));
+        MHARTID_int(h) <= std_logic_vector(resize(unsigned(core_id_i) * (THREAD_POOL_SIZE_GLOBAL- THREAD_POOL_SIZE)  + to_unsigned(h, THREAD_ID_SIZE), 10));
         -- CSR updating for all possible sources follows.
         --       ext. int., sw int., timer int., exceptions.
         --       We update CSR following this order, the software interrupt vector manager follows
@@ -525,7 +534,7 @@ begin
                 case csr_op_i is
                   when CSRRC|CSRRS|CSRRCI|CSRRSI =>
                     if(rs1(instr_word_IE) = 0) then
-                      csr_rdata_o_replicated(h) <= (10 to 31 => '0') & MHARTID(h);
+                      csr_rdata_o_replicated(h) <= (10 to 31 => '0') & MHARTID_int(h);
                     else
                       csr_access_denied_o_replicated(h) <= '1';
                     end if;
@@ -811,8 +820,8 @@ begin
                 if (MHPMCOUNTER_EN = 1 or MCYCLE_EN = 1 or MINSTRET_EN = 1) then
                   case csr_op_i is
                     when CSRRW|CSRRWI =>
-                      csr_rdata_o_replicated(h) <= PCER(h);
-                      PCER(h)                   <= csr_wdata_i;
+                      csr_rdata_o_replicated(h) <= PCER_int(h);
+                      PCER_int(h)                   <= csr_wdata_i;
                       MHPMEVENT3(h)             <= csr_wdata_i(2); 
                       MHPMEVENT6(h)             <= csr_wdata_i(5);
                       MHPMEVENT7(h)             <= csr_wdata_i(6);
@@ -821,27 +830,27 @@ begin
                       MHPMEVENT10(h)            <= csr_wdata_i(9);
 
                     when CSRRS|CSRRSI =>
-                      csr_rdata_o_replicated(h) <= PCER(h);
+                      csr_rdata_o_replicated(h) <= PCER_int(h);
                       if(rs1(instr_word_IE) /= 0) then
-                        PCER(h)        <= (PCER(h) or csr_wdata_i);
-                        MHPMEVENT3(h)  <= (PCER(h)(2) or csr_wdata_i(2));
-                        MHPMEVENT6(h)  <= (PCER(h)(5) or csr_wdata_i(5));
-                        MHPMEVENT7(h)  <= (PCER(h)(6) or csr_wdata_i(6));
-                        MHPMEVENT8(h)  <= (PCER(h)(7) or csr_wdata_i(7));
-                        MHPMEVENT9(h)  <= (PCER(h)(8) or csr_wdata_i(8));
-                        MHPMEVENT10(h) <= (PCER(h)(9) or csr_wdata_i(9));
+                        PCER_int(h)        <= (PCER_int(h) or csr_wdata_i);
+                        MHPMEVENT3(h)  <= (PCER_int(h)(2) or csr_wdata_i(2));
+                        MHPMEVENT6(h)  <= (PCER_int(h)(5) or csr_wdata_i(5));
+                        MHPMEVENT7(h)  <= (PCER_int(h)(6) or csr_wdata_i(6));
+                        MHPMEVENT8(h)  <= (PCER_int(h)(7) or csr_wdata_i(7));
+                        MHPMEVENT9(h)  <= (PCER_int(h)(8) or csr_wdata_i(8));
+                        MHPMEVENT10(h) <= (PCER_int(h)(9) or csr_wdata_i(9));
 
                       end if;
                     when CSRRC|CSRRCI =>
-                      csr_rdata_o_replicated(h) <= PCER(h);
+                      csr_rdata_o_replicated(h) <= PCER_int(h);
                       if(rs1(instr_word_IE) /= 0) then
-                        PCER(h)        <= (PCER(h) and not(csr_wdata_i));
-                        MHPMEVENT3(h)  <= (PCER(h)(2) and not (csr_wdata_i(2)));
-                        MHPMEVENT6(h)  <= (PCER(h)(5) and not (csr_wdata_i(5)));
-                        MHPMEVENT7(h)  <= (PCER(h)(6) and not (csr_wdata_i(6)));
-                        MHPMEVENT8(h)  <= (PCER(h)(7) and not (csr_wdata_i(7)));
-                        MHPMEVENT9(h)  <= (PCER(h)(8) and not (csr_wdata_i(8)));
-                        MHPMEVENT10(h) <= (PCER(h)(9) and not (csr_wdata_i(9)));
+                        PCER_int(h)        <= (PCER_int(h) and not(csr_wdata_i));
+                        MHPMEVENT3(h)  <= (PCER_int(h)(2) and not (csr_wdata_i(2)));
+                        MHPMEVENT6(h)  <= (PCER_int(h)(5) and not (csr_wdata_i(5)));
+                        MHPMEVENT7(h)  <= (PCER_int(h)(6) and not (csr_wdata_i(6)));
+                        MHPMEVENT8(h)  <= (PCER_int(h)(7) and not (csr_wdata_i(7)));
+                        MHPMEVENT9(h)  <= (PCER_int(h)(8) and not (csr_wdata_i(8)));
+                        MHPMEVENT10(h) <= (PCER_int(h)(9) and not (csr_wdata_i(9)));
                       end if;
                     when others =>
                       null;
@@ -856,12 +865,12 @@ begin
                     when CSRRW|CSRRWI =>
                       csr_rdata_o_replicated(h) <= (2 => MHPMEVENT3(h), others => '0');
                       MHPMEVENT3(h)             <= csr_wdata_i(2);
-                      PCER(h)(2)                <= csr_wdata_i(2);
+                      PCER_int(h)(2)                <= csr_wdata_i(2);
                     when CSRRS|CSRRSI =>
                       csr_rdata_o_replicated(h) <= (2 => MHPMEVENT3(h), others => '0');
                       if(rs1(instr_word_IE) /= 0) then
                         MHPMEVENT3(h) <= (MHPMEVENT3(h) or csr_wdata_i(2));
-                        PCER(h)(2)    <= (PCER(h)(2) or csr_wdata_i(2));
+                        PCER_int(h)(2)    <= (PCER_int(h)(2) or csr_wdata_i(2));
                       end if;
                     when CSRRC|CSRRCI =>
                       csr_rdata_o_replicated(h) <= (2 => MHPMEVENT3(h), others => '0');
@@ -881,12 +890,12 @@ begin
                     when CSRRW|CSRRWI =>
                       csr_rdata_o_replicated(h) <= (5 => MHPMEVENT6(h), others => '0');
                       MHPMEVENT6(h)             <= csr_wdata_i(5);
-                      PCER(h)(5)                <= csr_wdata_i(5);
+                      PCER_int(h)(5)                <= csr_wdata_i(5);
                     when CSRRS|CSRRSI =>
                       csr_rdata_o_replicated(h) <= (5 => MHPMEVENT6(h), others => '0');
                       if(rs1(instr_word_IE) /= 0) then
                         MHPMEVENT6(h) <= (MHPMEVENT6(h) or csr_wdata_i(5));
-                        PCER(h)(5)    <= (PCER(h)(5) or csr_wdata_i(5));
+                        PCER_int(h)(5)    <= (PCER_int(h)(5) or csr_wdata_i(5));
                       end if;
                     when CSRRC|CSRRCI =>
                       csr_rdata_o_replicated(h) <= (5 => MHPMEVENT6(h), others => '0');
@@ -906,12 +915,12 @@ begin
                     when CSRRW|CSRRWI =>
                       csr_rdata_o_replicated(h) <= (6 => MHPMEVENT7(h), others => '0');
                       MHPMEVENT7(h)             <= csr_wdata_i(6);
-                      PCER(h)(6)                <= csr_wdata_i(6);
+                      PCER_int(h)(6)                <= csr_wdata_i(6);
                     when CSRRS|CSRRSI =>
                       csr_rdata_o_replicated(h) <= (6 => MHPMEVENT7(h), others => '0');
                       if(rs1(instr_word_IE) /= 0) then
                         MHPMEVENT7(h) <= (MHPMEVENT7(h) or csr_wdata_i(6));
-                        PCER(h)(6)    <= (PCER(h)(6) or csr_wdata_i(6));
+                        PCER_int(h)(6)    <= (PCER_int(h)(6) or csr_wdata_i(6));
                       end if;
                     when CSRRC|CSRRCI =>
                       csr_rdata_o_replicated(h) <= (6 => MHPMEVENT7(h), others => '0');
@@ -931,12 +940,12 @@ begin
                     when CSRRW|CSRRWI =>
                       csr_rdata_o_replicated(h) <= (7 => MHPMEVENT8(h), others => '0');
                       MHPMEVENT8(h)             <= csr_wdata_i(7);
-                      PCER(h)(7)                <= csr_wdata_i(7);
+                      PCER_int(h)(7)                <= csr_wdata_i(7);
                     when CSRRS|CSRRSI =>
                       csr_rdata_o_replicated(h) <= (7 => MHPMEVENT8(h), others => '0');
                       if(rs1(instr_word_IE) /= 0) then
                         MHPMEVENT8(h) <= (MHPMEVENT8(h) or csr_wdata_i(7));
-                        PCER(h)(7)    <= (PCER(h)(7) or csr_wdata_i(7));
+                        PCER_int(h)(7)    <= (PCER_int(h)(7) or csr_wdata_i(7));
                       end if;
                     when CSRRC|CSRRCI =>
                       csr_rdata_o_replicated(h) <= (7 => MHPMEVENT8(h), others => '0');
@@ -956,12 +965,12 @@ begin
                     when CSRRW|CSRRWI =>
                       csr_rdata_o_replicated(h) <= (8 => MHPMEVENT9(h), others => '0');
                       MHPMEVENT9(h)             <= csr_wdata_i(8);
-                      PCER(h)(8)                <= csr_wdata_i(8);
+                      PCER_int(h)(8)                <= csr_wdata_i(8);
                     when CSRRS|CSRRSI =>
                       csr_rdata_o_replicated(h) <= (8 => MHPMEVENT9(h), others => '0');
                       if(rs1(instr_word_IE) /= 0) then
                         MHPMEVENT9(h) <= (MHPMEVENT9(h) or csr_wdata_i(8));
-                        PCER(h)(8)    <= (PCER(h)(8) or csr_wdata_i(8));
+                        PCER_int(h)(8)    <= (PCER_int(h)(8) or csr_wdata_i(8));
                       end if;
                     when CSRRC|CSRRCI =>
                       csr_rdata_o_replicated(h) <= (8 => MHPMEVENT9(h), others => '0');
@@ -981,12 +990,12 @@ begin
                     when CSRRW|CSRRWI =>
                       csr_rdata_o_replicated(h) <= (9 => MHPMEVENT10(h), others => '0');
                       MHPMEVENT10(h)            <= csr_wdata_i(9);
-                      PCER(h)(9)                <= csr_wdata_i(9);
+                      PCER_int(h)(9)                <= csr_wdata_i(9);
                     when CSRRS|CSRRSI =>
                       csr_rdata_o_replicated(h) <= (9 => MHPMEVENT10(h), others => '0');
                       if(rs1(instr_word_IE) /= 0) then
                         MHPMEVENT10(h) <= (MHPMEVENT10(h) or csr_wdata_i(9));
-                        PCER(h)(9)     <= (PCER(h)(9) or csr_wdata_i(9));
+                        PCER_int(h)(9)     <= (PCER_int(h)(9) or csr_wdata_i(9));
                       end if;
                     when CSRRC|CSRRCI =>
                       csr_rdata_o_replicated(h) <= (9 => MHPMEVENT10(h), others => '0');
@@ -1025,7 +1034,7 @@ begin
           --The problems are only during writing on MCYCLE/H and MINSTRET/H or on any other counters that count csr instructions.
 
           if (MCYCLE_EN = 1) then
-            if (PCER(h)(0) = '1'
+            if (PCER_int(h)(0) = '1'
                     and not(csr_instr_req = '1'
                     and (csr_addr_i = (MCYCLE_addr) or csr_addr_i = MCYCLEH_addr)
                     and (csr_op_i = CSRRWI
@@ -1046,7 +1055,7 @@ begin
           end if;
 
           if (MINSTRET_EN = 1) then
-            if (PCER(h)(1) = '1'
+            if (PCER_int(h)(1) = '1'
                     and not(csr_instr_req = '1'
                     and (csr_addr_i = (MINSTRET_addr) or csr_addr_i = MINSTRETH_addr)
                     and (csr_op_i = CSRRWI
@@ -1068,7 +1077,7 @@ begin
             end if;
           end if;
 
-          if (PCER(h)(2) = '1') then    --load/store access stall
+          if (PCER_int(h)(2) = '1') then    --load/store access stall
             if (MHPMCOUNTER_EN = 1) then
               if (data_req_o = '1' and data_gnt_i = '0') then
                 MHPMCOUNTER3(h) <= std_logic_vector(unsigned(MHPMCOUNTER3(h))+1);
@@ -1076,7 +1085,7 @@ begin
             end if;
           end if;
 
-          if(PCER(h)(5) = '1') then     --load access 
+          if(PCER_int(h)(5) = '1') then     --load access 
             if (MHPMCOUNTER_EN = 1) then
               if harc_EXEC = h or count_all = 1 then -- count_all is bypass and enables counting regardless of the hart executing
                 if (data_req_o = '1' and data_gnt_i = '1' and data_we_o = '0') then
@@ -1086,7 +1095,7 @@ begin
             end if;
           end if;
 
-          if(PCER(h)(6) = '1') then     --store access 
+          if(PCER_int(h)(6) = '1') then     --store access 
             if (MHPMCOUNTER_EN = 1) then
               if harc_EXEC = h or count_all = 1 then  -- count_all is bypass and enables counting regardless of the hart executing
                 if (data_req_o = '1' and data_gnt_i = '1' and data_we_o = '1') then
@@ -1096,7 +1105,7 @@ begin
             end if;
           end if;
 
-          if(PCER(h)(7) = '1') then     --jump 
+          if(PCER_int(h)(7) = '1') then     --jump 
             if (MHPMCOUNTER_EN = 1) then
               if harc_EXEC = h or count_all = 1 then -- count_all is bypass and enables counting regardless of the hart executing
                 if (jump_instr = '1') then
@@ -1106,7 +1115,7 @@ begin
             end if;
           end if;
 
-          if(PCER(h)(8) = '1') then     --branch 
+          if(PCER_int(h)(8) = '1') then     --branch 
             if (MHPMCOUNTER_EN = 1) then
               if harc_EXEC = h or count_all = 1 then -- count_all is bypass and enables counting regardless of the hart executing
                 if (branch_instr = '1') then
@@ -1116,7 +1125,7 @@ begin
             end if;
           end if;
 
-          if(PCER(h)(9) = '1') then     --btaken
+          if(PCER_int(h)(9) = '1') then     --btaken
             if (MHPMCOUNTER_EN = 1) then
               if harc_EXEC = h or count_all = 1 then -- count_all is bypass and enables counting regardless of the hart executing
                 if (branch_instr = '1' and set_branch_condition = '1') then
@@ -1134,7 +1143,7 @@ begin
   -- end of replicated logic ------------------------------------------------------------
 
 --here we OR the signals coming from different CS logic replicas
-  process(csr_instr_done_replicated(h), csr_access_denied_o_replicated(h)) --VHDL1993
+  process(csr_instr_done_replicated, csr_access_denied_o_replicated) --VHDL1993
     variable wire1, wire2 : std_logic;
   begin
     wire1 := '0'; wire2 := '0';

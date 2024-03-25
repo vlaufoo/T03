@@ -131,6 +131,10 @@ architecture DECODE of ID_STAGE is
   signal block_valid_wb            : std_logic;
   signal zero_rd_wire              : std_logic;
 
+  -- Internal signals (VHDL1993)
+  signal ls_parallel_exec_int             : std_logic;
+  signal instr_rvalid_ID_intt              : std_logic;
+
   function rs1 (signal instr : in std_logic_vector(31 downto 0)) return integer is
   begin
     return to_integer(unsigned(instr(15+(RF_CEIL-1) downto 15)));
@@ -171,6 +175,10 @@ architecture DECODE of ID_STAGE is
 
 begin
 
+  -- Conection of internal signals to output ports (VHDL1993)
+  ls_parallel_exec <= ls_parallel_exec_int;
+  instr_rvalid_id_int <= instr_rvalid_id_intt;
+
   zero_rd_wire  <= '1' when rd(instr_word_ID) = 0 else '0';
 
   rs1_valid     <= rs1_valid_int;  
@@ -206,10 +214,10 @@ begin
       if served_irq(harc_ID)   = '1'  or
          core_busy_IE                    = '1'  or 
          core_busy_LS                    = '1'  or 
-         ls_parallel_exec                = '0'  then -- the instruction pipeline is halted
+         ls_parallel_exec_int                = '0'  then -- the instruction pipeline is halted
         halt_IE  <= '1';
         halt_LSU <= '1';
-      elsif instr_rvalid_ID_int = '0' then -- wait for a valid instruction
+      elsif instr_rvalid_id_intt= '0' then -- wait for a valid instruction
         halt_IE  <= '0';
         halt_LSU <= '0';
       else  -- process the incoming instruction 
@@ -567,7 +575,7 @@ begin
     end if;  -- clk
   end process;
 
-  instr_rvalid_ID_int <= instr_rvalid_ID or instr_rvalid_ID_int_lat when instr_rvalid_IE = '0' else instr_rvalid_ID;
+  instr_rvalid_id_intt<= instr_rvalid_ID or instr_rvalid_ID_int_lat when instr_rvalid_IE = '0' else instr_rvalid_ID;
 
   process(clk_i, rst_ni)
   begin
@@ -576,7 +584,7 @@ begin
     elsif rising_edge(clk_i) then
       if core_busy_LS      = '0' and 
          core_busy_IE      = '0' and 
-         ls_parallel_exec  = '1' then
+         ls_parallel_exec_int  = '1' then
         instr_rvalid_ID_int_lat <= '0';
       elsif instr_rvalid_ID = '1' then -- else latch the internal instruction to maintain its state
         instr_rvalid_ID_int_lat <= '1';
@@ -596,16 +604,18 @@ begin
 
   Superscalar_Enable : if superscalar_exec_en = 1 generate
   fsm_ID_comb : process(
-                        instr_word_ID, busy_LS, core_busy_IE, core_busy_LS, ls_parallel_exec, instr_rvalid_ID_int
+                        instr_word_ID, busy_LS, core_busy_IE, core_busy_LS, ls_parallel_exec_int, instr_rvalid_ID_intt
                        ) --VHDL1993
   variable OPCODE_wires  : std_logic_vector (6 downto 0);
+  variable parallel_execution : boolean;
   begin
-    OPCODE_wires  := OPCODE(instr_word_ID); 
+    OPCODE_wires  := OPCODE(instr_word_ID);
     -- parallelism enablers, halts the pipeline when it is zero. -------------------
-    ls_parallel_exec  <= '0' when (OPCODE_wires = LOAD or OPCODE_wires = STORE or OPCODE_wires = AMO or OPCODE_wires = KMEM) and busy_LS = '1' and instr_rvalid_ID_int = '1' else '1';
+    parallel_execution := (OPCODE_wires = LOAD or OPCODE_wires = STORE or OPCODE_wires = AMO or OPCODE_wires = KMEM) and busy_LS = '1' and instr_rvalid_id_intt= '1';
+    ls_parallel_exec_int  <= '0' when parallel_execution else '1';
     busy_ID <= '0';  -- wait for a valid instruction or process the instruction 
     -- A data deoendency is only valid to make a stall when the current dependent instruction is not flushed 
-    if core_busy_IE = '1' or core_busy_LS = '1' or ls_parallel_exec = '0' then
+    if core_busy_IE = '1' or core_busy_LS = '1' or ls_parallel_exec_int = '0' then
       busy_ID <= '1';  -- wait for the stall to finish, block new instructions
     end if; 
   end process;
@@ -613,15 +623,15 @@ begin
 
   Superscalar_Disable: if superscalar_exec_en = 0 generate
   fsm_ID_comb : process(
-                        instr_word_ID, busy_LS, core_busy_LS, core_busy_IE, ls_parallel_exec, instr_rvalid_ID_int
+                        instr_word_ID, busy_LS, core_busy_LS, core_busy_IE, ls_parallel_exec_int, instr_rvalid_ID_intt
                        ) --VHDL 1993
   variable OPCODE_wires  : std_logic_vector (6 downto 0);
   begin
     OPCODE_wires      := OPCODE(instr_word_ID); 
     busy_ID           <= '0';
-    ls_parallel_exec  <= '0' when busy_LS = '1' and instr_rvalid_ID_int = '1' else '1';
+    ls_parallel_exec_int  <= '0' when busy_LS = '1' and instr_rvalid_id_intt= '1' else '1';
     -- A data deoendency is only valid to make a stall when the current dependent instruction is not flushed
-    if core_busy_IE = '1' or core_busy_LS = '1' or ls_parallel_exec = '0' then
+    if core_busy_IE = '1' or core_busy_LS = '1' or ls_parallel_exec_int = '0' then
       busy_ID <= '1';  -- wait for the stall to finish, block new instructions 
     end if; 
   end process;

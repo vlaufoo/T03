@@ -114,6 +114,13 @@ architecture PC of Program_counter is
 
   signal halt_en                               : std_logic_vector(harc_range);
 
+  -- Internal signals (VHDL1993)
+  signal served_ie_except_condition_int        : std_logic_vector(harc_range);
+  signal served_ls_except_condition_int        : std_logic_vector(harc_range);
+  signal served_except_condition_int           : std_logic_vector(harc_range);
+  signal served_mret_condition_int             : std_logic_vector(harc_range);
+
+
   ------------------------------------------------------------------------------------------------------------
   -- Subroutine implementing pc updating combinational logic, that is replicated for the threads supported  --
   ------------------------------------------------------------------------------------------------------------
@@ -191,6 +198,12 @@ begin
   incremented_pc           <= incremented_pc_internal;
   taken_branch_pending     <= taken_branch_pending_internal;
   irq_pending              <= irq_pending_internal;
+
+  -- Connecting internal signals to ports
+  served_ie_except_condition <= served_ie_except_condition_int;
+  served_ls_except_condition <= served_ls_except_condition_int;
+  served_except_condition <= served_except_condition_int;
+  served_mret_condition <= served_mret_condition_int;
 
   hardware_context_counter : process(clk_i, rst_ni)
   begin
@@ -278,10 +291,10 @@ begin
         pc(h)                                   <= pc_wire(h);
         taken_branch_pc_pending_internal_lat(h) <= taken_branch_pc_pending_internal(h);
         taken_branch_pending_internal_lat(h)    <= taken_branch_pending_internal(h);
-        served_ie_except_condition_lat(h)       <= served_ie_except_condition(h);
-        served_ls_except_condition_lat(h)       <= served_ls_except_condition(h);
-        served_except_condition_lat(h)          <= served_except_condition(h);
-        served_mret_condition_lat(h)            <= served_mret_condition(h);
+        served_ie_except_condition_lat(h)       <= served_ie_except_condition_int(h);
+        served_ls_except_condition_lat(h)       <= served_ls_except_condition_int(h);
+        served_except_condition_lat(h)          <= served_except_condition_int(h);
+        served_mret_condition_lat(h)            <= served_mret_condition_int(h);
       end if;
     end process;
 
@@ -296,13 +309,13 @@ begin
                               incremented_pc_internal(h), pc_update_enable(h)
                              ) --VHDL1993
     begin
-      pc_wire(h)                          <= pc(h);
-      taken_branch_pc_pending_internal(h) <= taken_branch_pc_pending_internal_lat(h);
-      taken_branch_pending_internal(h)    <= taken_branch_pending_internal_lat(h);
-      served_ie_except_condition(h)       <= served_ie_except_condition_lat(h);
-      served_ls_except_condition(h)       <= served_ls_except_condition_lat(h);
-      served_except_condition(h)          <= served_except_condition_lat(h);
-      served_mret_condition(h)            <= served_mret_condition_lat(h);
+      pc_wire(h)                              <= pc(h);
+      taken_branch_pc_pending_internal(h)     <= taken_branch_pc_pending_internal_lat(h);
+      taken_branch_pending_internal(h)        <= taken_branch_pending_internal_lat(h);
+      served_ie_except_condition_int(h)       <= served_ie_except_condition_lat(h);
+      served_ls_except_condition_int(h)       <= served_ls_except_condition_lat(h);
+      served_except_condition_int(h)          <= served_except_condition_lat(h);
+      served_mret_condition_int(h)            <= served_mret_condition_lat(h);
       if (reset_state(h) = '0') then
         pc_update(
           fetch_enable_i,
@@ -325,10 +338,10 @@ begin
           taken_branch_pc_pending_internal_lat(h), 
           incremented_pc_internal(h), 
           pc_update_enable(h), 
-          served_ie_except_condition(h), 
-          served_ls_except_condition(h),
-          served_except_condition(h), 
-          served_mret_condition(h)
+          served_ie_except_condition_int(h), 
+          served_ls_except_condition_int(h),
+          served_except_condition_int(h), 
+          served_mret_condition_int(h)
         );
       end if;
     end process;

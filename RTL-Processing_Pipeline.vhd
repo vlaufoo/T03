@@ -266,7 +266,28 @@ architecture Pipe of Pipeline is
   signal RAW_wire                    : array_2d_int(buf_size-1 downto 0);
   signal RAW                         : array_2d_int(buf_size-1 downto 0);
   signal tracer_result               : std_logic_vector(31 downto 0);
-  signal tracer_mul_result           : std_logic_vector(63 downto 0);   
+  signal tracer_mul_result           : std_logic_vector(63 downto 0);
+
+  -- Internal signals (VHDL1993)
+  signal served_irq_int              : std_logic_vector(THREAD_POOL_SIZE-1 downto 0);
+  signal instr_rvalid_IE_int         : std_logic;
+  signal pc_IE_int                   : std_logic_vector(31 downto 0);
+  signal pc_ID_int                   : std_logic_vector(31 downto 0);
+  signal absolute_jump_int           : std_logic_vector(harc_range);
+  signal harc_ID_int                 : natural range THREAD_POOL_SIZE-1 downto 0;
+  signal ie_taken_branch_int         : std_logic;
+  signal ls_taken_branch_int         : std_logic;
+  signal RS1_Data_IE_int             : std_logic_vector(31 downto 0);
+  signal RS2_Data_IE_int             : std_logic_vector(31 downto 0);
+  signal RD_Data_IE_int              : std_logic_vector(31 downto 0);
+  signal instr_word_IE_int           : std_logic_vector(31 downto 0);
+  signal instr_rvalid_ie_int         : std_logic;
+  signal harc_exec_int               : natural range THREAD_POOL_SIZE-1 downto 0;
+  signal ie_except_condition_int     : std_logic;
+  signal ls_except_condition_int     : std_logic;
+  signal taken_branch_int            : std_logic;
+  signal set_except_condition_int    : std_logic;
+
 
   function rs1 (signal instr : in std_logic_vector(31 downto 0)) return integer is
   begin
@@ -589,9 +610,9 @@ begin
     report "Threading configuration not supported"
   severity error;
 
-  set_except_condition <= '1' when (IE_except_condition = '1' or LS_except_condition = '1') else '0';
+  set_except_condition <= '1' when (IE_except_condition_int = '1' or LS_except_condition_int = '1') else '0';
 
-  taken_branch <= '1' when (ie_taken_branch = '1' or ls_taken_branch = '1') else '0';
+  taken_branch <= '1' when (ie_taken_branch_int = '1' or ls_taken_branch_int = '1') else '0';
           
   csr_wdata_i <= ie_csr_wdata_i;
 
@@ -600,10 +621,31 @@ begin
 -- Core_busy_o
 ------------------------------------------------------------------------------------------------------------------------------------
 
-  core_busy_o <= '1' when (instr_rvalid_i or instr_rvalid_ID or instr_rvalid_IE) = '1' and rst_ni = '1' else '0';
+  core_busy_o <= '1' when (instr_rvalid_i or instr_rvalid_ID or instr_rvalid_IE_int) = '1' and rst_ni = '1' else '0';
 ------------------------------------------------------------------------------------------------------------------------------------
 
   halt_update <= halt_update_IE;
+
+------------------------------------------------------------------------------------------------------------------------------------
+-- Connecting internal signals to pipeline ports
+
+  served_irq <= served_irq_int;
+  instr_rvalid_IE <= instr_rvalid_IE_int;
+  pc_IE <= pc_IE_int;
+  pc_ID <= pc_ID_int;
+  absolute_jump <= absolute_jump_int;
+  harc_ID <= harc_ID_int;
+  ie_taken_branch <= ie_taken_branch_int;
+  ls_taken_branch <= ls_taken_branch_int;
+  RS1_Data_IE <= RS1_Data_IE_int;
+  RS2_Data_IE <= RS2_Data_IE_int;
+  RD_Data_IE <= RD_Data_IE_int;
+  instr_word_IE <= instr_word_IE_int;
+  harc_exec <= harc_exec_int;
+  ls_except_condition <= ls_except_condition_int;
+  ie_except_condition <= ie_except_condition_int;
+  set_except_condition <= set_except_condition_int;
+  taken_branch <= taken_branch_int;
 
 ------------------------------------------------------------------------------------------------------------------------------------
 -- Mapping of the pipeline stages
@@ -628,19 +670,19 @@ begin
     pc_IF                      => pc_IF,
     busy_ID                    => busy_ID,   
     instr_rvalid_i             => instr_rvalid_i,
-    served_irq                 => served_irq,
+    served_irq                 => served_irq_int,
     harc_IF                    => harc_IF,
-    harc_ID                    => harc_ID,
-    pc_ID                      => pc_ID,
+    harc_ID                    => harc_ID_int,
+    pc_ID                      => pc_ID_int,
     instr_rvalid_ID            => instr_rvalid_ID,
     instr_word_ID              => instr_word_ID,
     rs1_valid_ID               => rs1_valid_ID, 
     rs2_valid_ID               => rs2_valid_ID, 
     rd_valid_ID                => rd_valid_ID, 
     rd_read_valid_ID           => rd_read_valid_ID,
-    instr_rvalid_IE            => instr_rvalid_IE,
-    pc_IE                      => pc_IE,
-    absolute_jump              => absolute_jump, 
+    instr_rvalid_IE            => instr_rvalid_IE_int,
+    pc_IE                      => pc_IE_int,
+    absolute_jump              => absolute_jump_int, 
     clk_i                      => clk_i,
     rst_ni                     => rst_ni,
     instr_req_o                => instr_req_o,      
@@ -670,10 +712,10 @@ begin
     amo_load_skip              => amo_load_skip,
     load_op                    => load_op,
     store_op                   => store_op,      
-    instr_word_IE              => instr_word_IE,
+    instr_word_IE              => instr_word_ie_int,
     MSTATUS                    => MSTATUS,
-    harc_ID                    => harc_ID,
-    pc_ID                      => pc_ID,
+    harc_ID                    => harc_ID_int,
+    pc_ID                      => pc_ID_int,
     rs1_valid_ID               => rs1_valid_ID,
     rs2_valid_ID               => rs2_valid_ID,
     rd_valid_ID                => rd_valid_ID,
@@ -683,15 +725,15 @@ begin
     busy_LS                    => busy_LS,
     busy_ID                    => busy_ID,
     ls_parallel_exec           => ls_parallel_exec,
-    pc_IE                      => pc_IE,
+    pc_IE                      => pc_IE_int,
     WB_EN_next_ID              => WB_EN_next_ID,
     instr_rvalid_ID            => instr_rvalid_ID,
-    instr_rvalid_IE            => instr_rvalid_IE,
+    instr_rvalid_IE            => instr_rvalid_IE_int,
     instr_rvalid_ID_int        => instr_rvalid_ID_int,
     halt_IE                    => halt_IE,
     halt_LSU                   => halt_LSU,
     instr_word_ID              => instr_word_ID,
-    absolute_jump              => absolute_jump,
+    absolute_jump              => absolute_jump_int,
     harc_LS_WB                 => harc_LS_WB,
     harc_IE_WB                 => harc_IE_WB,
     LS_WB_EN                   => LS_WB_EN,
@@ -702,11 +744,11 @@ begin
     MUL_WB_EN_wire             => MUL_WB_EN_wire,
     instr_word_LS_WB           => instr_word_LS_WB,
     instr_word_IE_WB           => instr_word_IE_WB,
-    set_except_condition       => set_except_condition,
-    served_irq                 => served_irq,
+    set_except_condition       => set_except_condition_int,
+    served_irq                 => served_irq_int,
     --sw_mip                     => sw_mip,
     signed_op                  => signed_op,
-    harc_EXEC                  => harc_EXEC,
+    harc_EXEC                  => harc_exec_int,
     harc_WB                    => harc_WB,
     PC_offset_ID               => PC_offset_ID,
     set_branch_condition_ID    => set_branch_condition_ID,
@@ -723,15 +765,15 @@ begin
     clk_i                      => clk_i,
     rst_ni                     => rst_ni,    
     irq_pending                => irq_pending,
-    instr_word_IE              => instr_word_IE,                  
-    pc_IE                      => pc_IE,   
-    RS1_Data_IE                => RS1_Data_IE,           
-    RS2_Data_IE                => RS2_Data_IE,           
-    RD_Data_IE                 => RD_Data_IE,
+    instr_word_IE              => instr_word_ie_int,                  
+    pc_IE                      => pc_IE_int,   
+    RS1_Data_IE                => rs1_data_ie_int,           
+    RS2_Data_IE                => rs2_data_ie_int,           
+    RD_Data_IE                 => RD_Data_IE_int,
     decoded_instruction_LS     => decoded_instruction_LS,
     data_be_ID                 => data_be_ID,
     data_width_ID              => data_width_ID,
-    harc_EXEC                  => harc_EXEC,
+    harc_EXEC                  => harc_exec_int,
     LS_instr_req               => LS_instr_req,
     load_op                    => load_op,
     store_op                   => store_op,
@@ -742,7 +784,7 @@ begin
     data_addr_internal         => data_addr_internal, 
     ls_except_data             => ls_except_data,  
     ls_except_condition        => ls_except_condition,        
-    ls_taken_branch            => ls_taken_branch,
+    ls_taken_branch            => ls_taken_branch_int,
     amo_load                   => amo_load,              
     amo_load_skip              => amo_load_skip,         
     amo_store                  => amo_store,    
@@ -781,15 +823,15 @@ begin
     sw_irq_served_i            => sw_irq_served_i, 
     sw_irq_served_o            => sw_irq_served_o,
     sw_irq_pending             => sw_irq_pending,
-    RS1_Data_IE                => RS1_Data_IE,
-    RS2_Data_IE                => RS2_Data_IE,
+    RS1_Data_IE                => rs1_data_ie_int,
+    RS2_Data_IE                => rs2_data_ie_int,
     irq_pending                => irq_pending,
     fetch_enable_i             => fetch_enable_i,
     csr_instr_done             => csr_instr_done,
     csr_access_denied_o        => csr_access_denied_o,
     csr_rdata_o                => csr_rdata_o,
-    pc_IE                      => pc_IE,
-    instr_word_IE              => instr_word_IE,
+    pc_IE                      => pc_IE_int,
+    instr_word_IE              => instr_word_ie_int,
     data_addr_internal_IE      => data_addr_internal_IE,
     comparator_en              => comparator_en,
     --sw_mip                     => sw_mip,
@@ -806,10 +848,10 @@ begin
     ie_instr_req               => ie_instr_req,
     MHARTID                    => MHARTID,
     MSTATUS                    => MSTATUS,
-    harc_EXEC                  => harc_EXEC,
-    instr_rvalid_IE            => instr_rvalid_IE,
+    harc_EXEC                  => harc_exec_int,
+    instr_rvalid_IE            => instr_rvalid_IE_int,
     WB_EN_next_ID              => WB_EN_next_ID,
-    taken_branch               => taken_branch,
+    taken_branch               => taken_branch_int,
     halt_IE                    => halt_IE,
     decoded_instruction_IE     => decoded_instruction_IE,
     wfi_hart_wire              => wfi_hart_wire,
@@ -826,18 +868,18 @@ begin
     WFI_Instr                  => WFI_Instr,
     sleep_state                => sleep_state,
     set_branch_condition       => set_branch_condition,
-    IE_except_condition        => IE_except_condition,
+    IE_except_condition        => ie_except_condition_int,
     set_mret_condition         => set_mret_condition,
     set_wfi_condition          => set_wfi_condition,
-    ie_taken_branch            => ie_taken_branch,
+    ie_taken_branch            => ie_taken_branch_int,
     branch_instr               => branch_instr,
     branch_instr_lat           => branch_instr_lat,
     PC_offset                  => PC_offset,
     absolute_address           => absolute_address,
-    served_irq                 => served_irq,
+    served_irq                 => served_irq_int,
     served_pending_irq         => served_pending_irq,
     ebreak_instr               => ebreak_instr,
-    absolute_jump              => absolute_jump,
+    absolute_jump              => absolute_jump_int,
     instr_word_IE_WB           => instr_word_IE_WB,
     IE_WB_EN                   => IE_WB_EN,
     IE_WB_EN_wire              => IE_WB_EN_wire,
@@ -865,8 +907,8 @@ begin
     clk_i                      => clk_i,
     rst_ni                     => rst_ni,
     -- Branch Control Signals
-    harc_ID                    => harc_ID,
-    pc_ID                      => pc_ID,
+    harc_ID                    => harc_ID_int,
+    pc_ID                      => pc_ID_int,
     core_busy_IE               => core_busy_IE,
     core_busy_LS               => core_busy_LS,
     ls_parallel_exec           => ls_parallel_exec,
@@ -891,9 +933,9 @@ begin
     pass_BLTU                  => pass_BLTU,
     pass_BGE                   => pass_BGE,
     pass_BGEU                  => pass_BGEU,
-    RS1_Data_IE                => RS1_Data_IE,
-    RS2_Data_IE                => RS2_Data_IE,
-    RD_Data_IE                 => RD_Data_IE,
+    RS1_Data_IE                => rs1_data_ie_int,
+    RS2_Data_IE                => rs2_data_ie_int,
+    RD_Data_IE                 => RD_Data_IE_int,
     data_addr_internal_IE      => data_addr_internal_IE,
     regfile                    => regfile
   );
@@ -1514,7 +1556,7 @@ begin
 
   Tracer_Comb : process(
                         state_IE, IE_instr_req, core_busy_IE_lat, irq_pending, decoded_instruction_IE, 
-                        instr_word_IE, RS1_Data_IE, RS2_Data_IE, pc_IE, LS_instr_req, state_LS, 
+                        instr_word_ie_int, rs1_data_ie_int, rs2_data_ie_int, pc_IE_int, LS_instr_req, state_LS, 
                         decoded_instruction_LS
                        ) --VHDL1993
   -- also implements the delay slot counters and some aux signals

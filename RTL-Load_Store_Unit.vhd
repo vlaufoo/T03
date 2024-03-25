@@ -106,16 +106,36 @@ architecture LSU of Load_Store_Unit is
   signal flush_hart_int_wire        : std_logic_vector(harc_range);
   signal flush_hart_int             : std_logic_vector(harc_range);
 
+  -- Internal signals (VHDL1993)
+  signal data_we_o_int              : std_logic;
+  signal data_addr_internal_int     : std_logic_vector(31 downto 0);
+  signal busy_LS_int                : std_logic;
+  signal core_busy_LS_int           : std_logic;
+  signal LS_WB_EN_wire_int          : std_logic;
+  signal LS_WB_EN_int          : std_logic;
+  signal amo_store_int              : std_logic;
+  signal state_LS_int               : fsm_LS_states;
+
+
 begin
 
+  data_we_o <= data_we_o_int;
+  data_addr_internal <= data_addr_internal_int;
+  busy_LS <= busy_LS_int;
+  core_busy_LS <= core_busy_LS_int;
+  LS_WB_EN_wire <= LS_WB_EN_wire_int;
+  LS_WB_EN <= LS_WB_EN_int;
+  amo_store <= amo_store_int;
+  state_LS <= state_LS_int;
+
   -- Memory fault signals
-  load_err  <= data_gnt_i and data_err_i and not(data_we_o);
-  store_err <= data_gnt_i and data_err_i and data_we_o;
+  load_err  <= data_gnt_i and data_err_i and not(data_we_o_int);
+  store_err <= data_gnt_i and data_err_i and data_we_o_int;
 
   -- Memory address signal
-  data_addr_o <= data_addr_internal(31 downto 2) & "00";
+  data_addr_o <= data_addr_internal_int(31 downto 2) & "00";
   data_be_o <= to_stdlogicvector(to_bitvector(data_be_internal) sll
-                                 to_integer(unsigned(data_addr_internal(1 downto 0))));
+                                 to_integer(unsigned(data_addr_internal_int(1 downto 0))));
 
 ------------------------------------------------------------------------
 --  ██╗     ███████╗██╗   ██╗    ███████╗██╗   ██╗███╗   ██╗ ██████╗  --
@@ -130,25 +150,25 @@ begin
   begin
 	  
     if rst_ni = '0' then
-	    amo_store  <= '0';
+	    amo_store_int  <= '0';
 	    amo_store_lat  <= '0';
-	    LS_WB_EN <= '0';
+	    LS_WB_EN_int <= '0';
 	    busy_LS_lat <= '0';
 	    LS_WB <= (others => '0');
       harc_LS_WB <= THREAD_POOL_SIZE-1;
       misaligned_err <= '0';
       instr_word_LS_WB <= (others => '0');
     elsif rising_edge(clk_i) then
-      amo_store  <= '0';
+      amo_store_int  <= '0';
       misaligned_err <= '0';
       LS_WB       <= (others => '0');
-      busy_LS_lat <= busy_LS or core_busy_LS;
-      LS_WB_EN    <= LS_WB_EN_wire;
+      busy_LS_lat <= busy_LS_int or core_busy_LS_int;
+      LS_WB_EN_int    <= LS_WB_EN_wire_int;
       if ls_instr_req = '0' and busy_LS_lat = '0' then
-        --LS_WB_EN <= '0';
+        --LS_WB_EN_int <= '0';
       elsif LS_instr_req = '1' or busy_LS_lat = '1' then
-        --LS_WB_EN <= '0';
-        case state_LS is	
+        --LS_WB_EN_int <= '0';
+        case state_LS_int is	
           when normal =>
 
           --------------------------------------------------------------
@@ -161,8 +181,8 @@ begin
           --------------------------------------------------------------
 
             if load_op = '1' or (amo_load = '1' and halt_LSU = '0')then  -- Load Instructions
-              if ((data_addr_internal(1 downto 0) = "00" and data_width_ID = "10") or 
-                  (data_addr_internal(0)          = '0'  and data_width_ID = "01") or
+              if ((data_addr_internal_int(1 downto 0) = "00" and data_width_ID = "10") or 
+                  (data_addr_internal_int(0)          = '0'  and data_width_ID = "01") or
                                                              data_width_ID = "00") then
                 if load_err = '1' then
                   ls_except_data <= LOAD_ERROR_EXCEPT_CODE;
@@ -185,9 +205,9 @@ begin
           -----------------------------------------------------------------------
 
             -- AAA better not let sw_mip instructions make writes to address 0xFF00 or 0xFE00
-            if store_op = '1' or amo_store = '1' or (amo_load_skip = '1' and halt_LSU = '0') then	
-              if ((data_addr_internal(1 downto 0) = "00" and data_width_ID = "10") or 
-                  (data_addr_internal(0)          = '0'  and data_width_ID = "01") or
+            if store_op = '1' or amo_store_int = '1' or (amo_load_skip = '1' and halt_LSU = '0') then	
+              if ((data_addr_internal_int(1 downto 0) = "00" and data_width_ID = "10") or 
+                  (data_addr_internal_int(0)          = '0'  and data_width_ID = "01") or
                                                              data_width_ID = "00") then
                 RS2_Data_IE_lat <= RS2_Data_IE;	
                 if (store_err = '1') then
@@ -199,9 +219,9 @@ begin
               end if;
             end if;
 
-            if amo_store = '1' or amo_load_skip = '1' then
-              amo_store_lat <= amo_store;
-              amo_store <= '0';
+            if amo_store_int = '1' or amo_load_skip = '1' then
+              amo_store_lat <= amo_store_int;
+              amo_store_int <= '0';
             end if;
 			  
           when data_valid_waiting =>
@@ -224,25 +244,25 @@ begin
             if decoded_instruction_LS(LW_bit_position) = '1'  or (decoded_instruction_LS(AMOSWAP_bit_position) = '1' and amo_store_lat = '0' and amo_load_skip = '0') then
               if data_rvalid_i = '1' then
                 LS_WB <= data_rdata_i;
-                --LS_WB_EN <= '1';
+                --LS_WB_EN_int <= '1';
                 if decoded_instruction_LS(AMOSWAP_bit_position) = '1' then
-                  amo_store <= '1';
+                  amo_store_int <= '1';
                 end if;
               end if;
             end if;
 
             if decoded_instruction_LS(LH_bit_position) = '1' or decoded_instruction_LS(LHU_bit_position) = '1' then 
               if data_rvalid_i = '1' then
-                case data_addr_internal(1) is
+                case data_addr_internal_int(1) is
                   when '0' =>
-                  --LS_WB_EN <= '1';
+                  --LS_WB_EN_int <= '1';
                     if decoded_instruction_LS(LH_bit_position) = '1' then
                       LS_WB <= std_logic_vector(resize(signed(data_rdata_i(15 downto 0)), 32));
                     elsif decoded_instruction_LS(LHU_bit_position) = '1' then
                       LS_WB <= std_logic_vector(resize(unsigned(data_rdata_i(15 downto 0)), 32));
                     end if;
                   when '1' =>
-                    --LS_WB_EN <= '1';
+                    --LS_WB_EN_int <= '1';
                     if decoded_instruction_LS(LH_bit_position) = '1' then
                       LS_WB <= std_logic_vector(resize(signed(data_rdata_i(31 downto 16)), 32));
                     elsif decoded_instruction_LS(LHU_bit_position) = '1' then
@@ -256,8 +276,8 @@ begin
 
             if decoded_instruction_LS(LB_bit_position) = '1' or decoded_instruction_LS(LBU_bit_position) = '1' then 
               if data_rvalid_i = '1' then		
-                --LS_WB_EN <= '1';
-                case data_addr_internal(1 downto 0) is
+                --LS_WB_EN_int <= '1';
+                case data_addr_internal_int(1 downto 0) is
                   when "00" =>
                     if decoded_instruction_LS(LB_bit_position) = '1' then
                       LS_WB <= std_logic_vector(resize(signed(data_rdata_i(7 downto 0)), 32));
@@ -303,7 +323,7 @@ begin
 -------------------------------------------------------------------------
 
   LSU_comb : process(
-                      RS1_Data_IE, RS2_Data_IE, LS_WB_EN, ls_instr_req, busy_LS_lat, add_out, state_LS, load_op, amo_load, 
+                      RS1_Data_IE, RS2_Data_IE, LS_WB_EN_int, ls_instr_req, busy_LS_lat, add_out, state_LS_int, load_op, amo_load, 
                       halt_LSU, data_width_ID, data_be_ID, decoded_instruction_LS, amo_store_lat, 
                       amo_load_skip, data_rvalid_i, data_addr_internal_lat, store_op
                     ) --VHDL1993
@@ -311,7 +331,7 @@ begin
   variable data_addr_internal_wires         : std_logic_vector (31 downto 0);
   variable data_wdata_o_wires               : std_logic_vector (31 downto 0);
   variable data_be_internal_wires           : std_logic_vector (3 downto 0);
-  variable data_we_o_wires                  : std_logic;
+  variable data_we_o_int_wires                  : std_logic;
   variable data_req_o_wires                 : std_logic;
   variable ls_except_condition_wires        : std_logic;
   variable ls_taken_branch_wires            : std_logic;
@@ -321,10 +341,10 @@ begin
   begin
     data_addr_internal_wires         := std_logic_vector(signed(RS1_Data_IE));  -- The reset value was non-zero in order to keep the switching activity minimal
     nextstate_LS                     <= normal;
-    LS_WB_EN_wire                    <= LS_WB_EN;
+    LS_WB_EN_wire_int                <= LS_WB_EN_int;
     data_be_internal_wires           := (others => '0');
     data_wdata_o_wires               := (others => '0');
-    data_we_o_wires                  := '0';
+    data_we_o_int_wires                  := '0';
     data_req_o_wires                 := '0';
     ls_except_condition_wires        := '0';
     ls_taken_branch_wires            := '0';
@@ -332,10 +352,10 @@ begin
     busy_LS_wires                    := '0';
 
     if LS_instr_req = '0' and busy_LS_lat = '0' then
-      LS_WB_EN_wire <= '0';
+      LS_WB_EN_wire_int <= '0';
     elsif LS_instr_req = '1' or busy_LS_lat = '1' then
-      LS_WB_EN_wire <= '0';
-      case state_LS is
+      LS_WB_EN_wire_int <= '0';
+      case state_LS_int is
         when normal =>
 
           --------------------------------------------------------------
@@ -380,13 +400,13 @@ begin
           --  ╚══════╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚══════╝     ╚═════╝ ╚═╝       --
           -----------------------------------------------------------------------
 
-          if store_op = '1' or amo_store = '1' or (amo_load_skip = '1' and halt_LSU = '0') then
-            if amo_store = '0' and amo_load_skip = '0'  then
+          if store_op = '1' or amo_store_int = '1' or (amo_load_skip = '1' and halt_LSU = '0') then
+            if amo_store_int = '0' and amo_load_skip = '0'  then
               data_addr_internal_wires := add_out;
-            elsif amo_store = '1' or amo_load_skip = '1' then
+            elsif amo_store_int = '1' or amo_load_skip = '1' then
               data_addr_internal_wires := RS1_Data_IE;
             end if;
-            data_we_o_wires := '1';
+            data_we_o_int_wires := '1';
             if ((data_addr_internal_wires(1 downto 0) = "00" and data_width_ID = "10") or 
                 (data_addr_internal_wires(0)          = '0'  and data_width_ID = "01") or
                                                                  data_width_ID = "00") then
@@ -400,7 +420,7 @@ begin
                 else
                   nextstate_LS <= data_valid_waiting;
                   busy_LS_wires := '1';
-                  if amo_store = '1' or amo_load_skip = '1' then
+                  if amo_store_int = '1' or amo_load_skip = '1' then
                     core_busy_LS_wires := '1';
                   end if;
                 end if;
@@ -413,11 +433,11 @@ begin
               case data_addr_internal_wires(1) is
                 when '0' =>
                   data_wdata_o_wires := RS2_Data_IE(31 downto 0);
-                  data_we_o_wires        := '1';  -- is a writing
+                  data_we_o_int_wires        := '1';  -- is a writing
                   data_be_internal_wires := data_be_ID;
                 when '1' =>
                   data_wdata_o_wires := RS2_Data_IE(15 downto 0) & std_logic_vector(to_unsigned(0, 16));
-                  data_we_o_wires        := '1';  -- is a writing
+                  data_we_o_int_wires        := '1';  -- is a writing
                   data_be_internal_wires := data_be_ID;
                 when others =>
                   null;
@@ -427,19 +447,19 @@ begin
               case data_addr_internal_wires(1 downto 0) is
                 when "00" =>
                   data_wdata_o_wires := RS2_Data_IE(31 downto 0);
-                  data_we_o_wires        := '1';  -- is a writing
+                  data_we_o_int_wires        := '1';  -- is a writing
                   data_be_internal_wires := data_be_ID;
                 when "01" =>
                   data_wdata_o_wires := RS2_Data_IE(23 downto 0) & std_logic_vector(to_unsigned(0, 8));
-                  data_we_o_wires        := '1';  -- is a writing
+                  data_we_o_int_wires        := '1';  -- is a writing
                   data_be_internal_wires := data_be_ID;
                 when "10" =>
                   data_wdata_o_wires := RS2_Data_IE(15 downto 0) & std_logic_vector(to_unsigned(0, 16));
-                  data_we_o_wires        := '1';  -- is a writing
+                  data_we_o_int_wires        := '1';  -- is a writing
                   data_be_internal_wires := data_be_ID;
                 when "11" =>
                   data_wdata_o_wires := RS2_Data_IE(7 downto 0) & std_logic_vector(to_unsigned(0, 24));
-                  data_we_o_wires        := '1';  -- is a writing
+                  data_we_o_int_wires        := '1';  -- is a writing
                   data_be_internal_wires := data_be_ID;
                 when others =>
                   null;
@@ -452,17 +472,17 @@ begin
 
           if decoded_instruction_LS(LW_bit_position) = '1'  or (decoded_instruction_LS(AMOSWAP_bit_position) = '1' and amo_store_lat = '0' and amo_load_skip = '0') then
             if data_rvalid_i = '1' then
-              LS_WB_EN_wire <= '1';
+              LS_WB_EN_wire_int <= '1';
             end if;
           end if;
 
           if decoded_instruction_LS(LH_bit_position) = '1' or decoded_instruction_LS(LHU_bit_position) = '1' then 
             if data_rvalid_i = '1' then
-              case data_addr_internal(1) is
+              case data_addr_internal_int(1) is
                 when '0' =>
-                  LS_WB_EN_wire <= '1';
+                  LS_WB_EN_wire_int <= '1';
                 when '1' =>
-                  LS_WB_EN_wire <= '1';
+                  LS_WB_EN_wire_int <= '1';
                 when others =>
                   null;
               end case;
@@ -471,7 +491,7 @@ begin
 
           if decoded_instruction_LS(LB_bit_position) = '1' or decoded_instruction_LS(LBU_bit_position) = '1' then 
             if data_rvalid_i = '1' then   
-              LS_WB_EN_wire <= '1';
+              LS_WB_EN_wire_int <= '1';
             end if;
           end if;
 
@@ -490,18 +510,18 @@ begin
             if store_op = '1' or amo_store_lat = '1' or amo_load_skip = '1' then -- SW or AMOSWAP data writing
               if decoded_instruction_LS(SW_bit_position) = '1' then  -- SW data writing
                 data_wdata_o_wires     := RS2_Data_IE_lat(31 downto 0);
-                data_we_o_wires        := '1';  -- is a writing
+                data_we_o_int_wires        := '1';  -- is a writing
                 data_be_internal_wires := data_be_ID;
               end if;
               if decoded_instruction_LS(SH_bit_position) = '1' then  -- SH data writing
                 case data_addr_internal_wires(1) is
                   when '0' =>
                     data_wdata_o_wires := RS2_Data_IE_lat(31 downto 0);
-                    data_we_o_wires        := '1';  -- is a writing
+                    data_we_o_int_wires        := '1';  -- is a writing
                     data_be_internal_wires := data_be_ID;
                   when '1' =>
                     data_wdata_o_wires := RS2_Data_IE_lat(15 downto 0) & std_logic_vector(to_unsigned(0, 16));
-                    data_we_o_wires        := '1';  -- is a writing
+                    data_we_o_int_wires        := '1';  -- is a writing
                     data_be_internal_wires := data_be_ID;
                   when others =>
                     null;
@@ -511,19 +531,19 @@ begin
                 case data_addr_internal_wires(1 downto 0) is
                   when "00" =>
                     data_wdata_o_wires := RS2_Data_IE_lat(31 downto 0);
-                    data_we_o_wires        := '1';  -- is a writing
+                    data_we_o_int_wires        := '1';  -- is a writing
                     data_be_internal_wires := data_be_ID;
                   when "01" =>
                     data_wdata_o_wires := RS2_Data_IE_lat(23 downto 0) & std_logic_vector(to_unsigned(0, 8));
-                    data_we_o_wires        := '1';  -- is a writing
+                    data_we_o_int_wires        := '1';  -- is a writing
                     data_be_internal_wires := data_be_ID;
                   when "10" =>
                     data_wdata_o_wires := RS2_Data_IE_lat(15 downto 0) & std_logic_vector(to_unsigned(0, 16));
-                    data_we_o_wires        := '1';  -- is a writing
+                    data_we_o_int_wires        := '1';  -- is a writing
                     data_be_internal_wires := data_be_ID;
                   when "11" =>
                     data_wdata_o_wires := RS2_Data_IE_lat(7 downto 0) & std_logic_vector(to_unsigned(0, 24));
-                    data_we_o_wires        := '1';  -- is a writing
+                    data_we_o_int_wires        := '1';  -- is a writing
                     data_be_internal_wires := data_be_ID;
                   when others =>
                     null;
@@ -549,28 +569,28 @@ begin
       end case;
     end if;
 
-    data_addr_internal         <= data_addr_internal_wires;
+    data_addr_internal_int     <= data_addr_internal_wires;
     data_wdata_o               <= data_wdata_o_wires;
     data_be_internal           <= data_be_internal_wires;
-    data_we_o                  <= data_we_o_wires;
+    data_we_o_int              <= data_we_o_int_wires;
     data_req_o                 <= data_req_o_wires;
     ls_except_condition        <= ls_except_condition_wires;
     ls_taken_branch   	       <= ls_taken_branch_wires;
-    core_busy_LS               <= core_busy_LS_wires;
-    busy_LS                    <= busy_LS_wires;
+    core_busy_LS_int           <= core_busy_LS_wires;
+    busy_LS_int                <= busy_LS_wires;
   
   end process;
 
   fsm_LS_state : process(clk_i, rst_ni) -- also implements some aux signals
   begin
     if rst_ni = '0' then
-      state_LS <= normal; 
+      state_LS_int <= normal; 
       flush_hart_int <= (others => '0');
       harc_LOAD      <= THREAD_POOL_SIZE-1;
     elsif rising_edge(clk_i) then
       flush_hart_int         <= flush_hart_int_wire;
-      state_LS               <= nextstate_LS;
-      data_addr_internal_lat <= data_addr_internal;
+      state_LS_int               <= nextstate_LS;
+      data_addr_internal_lat <= data_addr_internal_int;
     end if;
   end process;
 

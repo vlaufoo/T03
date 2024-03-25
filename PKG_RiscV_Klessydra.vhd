@@ -57,7 +57,7 @@ package riscv_klessydra is
   constant dsp_halt_hart           : std_logic_vector(1 downto 0) := "01";
   constant dsp_exec                : std_logic_vector(1 downto 0) := "10";
 
-  constant THREAD_POOL_BASELINE    : integer := 3; 
+  constant THREAD_POOL_BASELINE    : integer := 3; --will be used in place of the generic THERAD_POOL_SIZE
   constant THREAD_ID_SIZE          : integer := 4;
   constant NOP_POOL_SIZE           : integer := 2;
   constant BRANCHING_DELAY_SLOT    : integer := 3;
