@@ -136,13 +136,13 @@ architecture Klessydra_M of klessydra_m_core is
   subtype harc_range is natural range THREAD_POOL_SIZE-1 downto 0;  -- will be used replicated units in the core
 
   -- Control Status Register (CSR) signals
-  signal MHARTID     : array_2d(harc_range)(9  downto 0);
-  signal MSTATUS     : array_2d(harc_range)(1 downto 0);
-  signal MEPC        : array_2d(harc_range)(31 downto 0);
-  signal MCAUSE      : array_2d(harc_range)(31 downto 0);
-  signal MIP         : array_2d(harc_range)(31 downto 0);
-  signal MTVEC       : array_2d(harc_range)(31 downto 0);
-  signal PCER        : array_2d(harc_range)(31 downto 0);
+  signal MHARTID     : harc_vec_array(9  downto 0);
+  signal MSTATUS     : harc_vec_array(1 downto 0);
+  signal MEPC        : harc_vec_array(31 downto 0);
+  signal MCAUSE      : harc_vec_array(31 downto 0);
+  signal MIP         : harc_vec_array(31 downto 0);
+  signal MTVEC       : harc_vec_array(31 downto 0);
+  signal PCER        : harc_vec_array(31 downto 0);
 
   signal sw_irq          : std_logic_vector(THREAD_POOL_SIZE_GLOBAL-1 downto 0);
   signal sw_irq_pending  : std_logic_vector(THREAD_POOL_SIZE_GLOBAL-1 downto 0);
@@ -189,10 +189,10 @@ architecture Klessydra_M of klessydra_m_core is
   signal set_mret_condition              : std_logic;
   signal absolute_address                : std_logic_vector(31 downto 0);
   signal PC_offset                       : std_logic_vector(31 downto 0);
-  signal pc_except_value                 : array_2d(harc_range)(31 downto 0);
-  signal pc_except_value_wire            : array_2d(harc_range)(31 downto 0);
-  signal incremented_pc                  : array_2d(harc_range)(31 downto 0);
-  signal relative_to_PC                  : array_2d(harc_range)(31 downto 0);
+  signal pc_except_value                 : harc_vec_array(31 downto 0);
+  signal pc_except_value_wire            : harc_vec_array(31 downto 0);
+  signal incremented_pc                  : harc_vec_array(31 downto 0);
+  signal relative_to_PC                  : harc_vec_array(31 downto 0);
   signal absolute_jump                   : std_logic_vector(harc_range);
   signal data_we_o_lat                   : std_logic;
   signal misaligned_err                  : std_logic;
@@ -207,7 +207,7 @@ architecture Klessydra_M of klessydra_m_core is
   --signal instruction_counter : std_logic_vector(63 downto 0);  -- RDINSTRET
 
   -- regfile replicated array
-  signal regfile            : array_3d(harc_range)(RF_SIZE-1 downto 0)(31 downto 0);
+  signal regfile            : regfile_array(31 downto 0);
 
   --signal used by counters
   signal set_wfi_condition          : std_logic;
@@ -284,8 +284,8 @@ architecture Klessydra_M of klessydra_m_core is
     instr_rvalid_IE                   : in  std_logic;
     pc_ID                             : in  std_logic_vector(31 downto 0);
     pc_IE                             : in  std_logic_vector(31 downto 0);
-    MSTATUS                           : in  array_2d(harc_range)(1 downto 0);
-    MIP, MEPC, MCAUSE, MTVEC          : in  array_2d(harc_range)(31 downto 0);
+    MSTATUS                           : in  harc_vec_array(1 downto 0);
+    MIP, MEPC, MCAUSE, MTVEC          : in  harc_vec_array(31 downto 0);
     instr_word_IE                     : in  std_logic_vector(31 downto 0);
     pc_IF                             : out std_logic_vector(31 downto 0);
     harc_IF                           : out harc_range;
@@ -295,7 +295,7 @@ architecture Klessydra_M of klessydra_m_core is
     served_mret_condition             : out std_logic_vector(harc_range);
     served_irq                        : in  std_logic_vector(harc_range);
     taken_branch_pending              : out std_logic_vector(harc_range);
-    incremented_pc                    : out array_2d(harc_range)(31 downto 0);
+    incremented_pc                    : out harc_vec_array(31 downto 0);
     irq_pending                       : out std_logic_vector(harc_range);
     PC_offset_ID                      : in  std_logic_vector(31 downto 0);
     set_branch_condition_ID           : in  std_logic;
@@ -331,7 +331,7 @@ architecture Klessydra_M of klessydra_m_core is
     served_mret_condition       : in  std_logic_vector(harc_range);
     served_irq                  : in  std_logic_vector(harc_range);
     served_pending_irq          : in  std_logic_vector(harc_range);
-    pc_except_value_wire        : in  array_2d(harc_range)(31 downto 0);
+    pc_except_value_wire        : in  harc_vec_array(31 downto 0);
     data_addr_internal          : in  std_logic_vector(31 downto 0);
     jump_instr                  : in  std_logic;
     branch_instr                : in  std_logic;
@@ -344,13 +344,13 @@ architecture Klessydra_M of klessydra_m_core is
     csr_instr_done              : out std_logic;
     csr_access_denied_o         : out std_logic;
     csr_rdata_o                 : out std_logic_vector (31 downto 0);
-    MHARTID                     : out array_2d(harc_range)(9 downto 0);
-    MSTATUS                     : out array_2d(harc_range)(1 downto 0);
-    MEPC                        : out array_2d(harc_range)(31 downto 0);
-    MCAUSE                      : out array_2d(harc_range)(31 downto 0);
-    MIP                         : out array_2d(harc_range)(31 downto 0);
-    MTVEC                       : out array_2d(harc_range)(31 downto 0);
-    PCER                        : out array_2d(harc_range)(31 downto 0);
+    MHARTID                     : out harc_vec_array(9 downto 0);
+    MSTATUS                     : out harc_vec_array(1 downto 0);
+    MEPC                        : out harc_vec_array(31 downto 0);
+    MCAUSE                      : out harc_vec_array(31 downto 0);
+    MIP                         : out harc_vec_array(31 downto 0);
+    MTVEC                       : out harc_vec_array(31 downto 0);
+    PCER                        : out harc_vec_array(31 downto 0);
     fetch_enable_i              : in  std_logic;
     clk_i                       : in  std_logic;
     rst_ni                      : in  std_logic;
@@ -396,9 +396,9 @@ architecture Klessydra_M of klessydra_m_core is
     csr_instr_done             : in  std_logic;
     csr_access_denied_o        : in  std_logic;
     csr_rdata_o                : in  std_logic_vector (31 downto 0);
-    MHARTID                    : in  array_2d(harc_range)(9  downto 0);
-    MSTATUS                    : in  array_2d(harc_range)(1 downto 0);
-    PCER                       : in  array_2d(harc_range)(31 downto 0);
+    MHARTID                    : in  harc_vec_array(9  downto 0);
+    MSTATUS                    : in  harc_vec_array(1 downto 0);
+    PCER                       : in  harc_vec_array(31 downto 0);
     served_irq                 : out std_logic_vector(harc_range);
     served_pending_irq         : out std_logic_vector(harc_range);
     misaligned_err             : out std_logic;
@@ -433,7 +433,7 @@ architecture Klessydra_M of klessydra_m_core is
     ebreak_instr               : out std_logic;
     data_addr_internal         : out std_logic_vector(31 downto 0);
     absolute_jump              : out std_logic_vector(harc_range);
-    regfile                    : out array_3d(harc_range)(RF_SIZE-1 downto 0)(31 downto 0);
+    regfile                    : out regfile_array(31 downto 0);
     PC_offset_ID               : out std_logic_vector(31 downto 0);
     set_branch_condition_ID    : out std_logic;
     -- clock, reset active low, test enable

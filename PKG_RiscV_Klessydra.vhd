@@ -51,6 +51,7 @@ package riscv_klessydra is
   constant NOP_POOL_SIZE           : integer := 2;
   constant BRANCHING_DELAY_SLOT    : integer := 3;
   constant RF_SIZE                 : natural := 32;
+  constant INSTR_BUF_SIZE          : integer := 10;
   --constant HARC_SIZE               : integer := THREAD_POOL_SIZE;
 
   constant SLEEP_MODE              : natural := 0;
@@ -63,11 +64,12 @@ package riscv_klessydra is
   type array_2d_int is array (integer range<>) of integer;
   type array_2d_nat is array (integer range<>) of natural;
 
-  -- Applicaiton specific types (VHDL1993)
+  -- Applicaiton specific types (VHDL1993) (they are not marked in the design files)
   type harc_vec_array  is array (natural range THREAD_POOL_BASELINE-1 downto 0) of std_logic_vector;
   type harc_array      is array (natural range THREAD_POOL_BASELINE-1 downto 0) of std_logic;
   type harc_array_int  is array (natural range THREAD_POOL_BASELINE-1 downto 0) of integer;
   type harc_array_nat  is array (natural range THREAD_POOL_BASELINE-1 downto 0) of natural;
+  type fw_buffer    is array (natural range INSTR_BUF_SIZE-1 downto 0) of std_logic_vector;
 
   type regfile_unit    is array (natural range RF_SIZE-1 downto 0) of std_logic_vector;
   type regfile_array   is array (natural range THREAD_POOL_BASELINE-1 downto 0) of regfile_unit;

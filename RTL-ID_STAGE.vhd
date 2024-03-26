@@ -48,7 +48,7 @@ entity ID_STAGE is
     load_op                    : out std_logic;
     store_op                   : out std_logic;
     instr_word_IE              : out std_logic_vector(31 downto 0);
-    MSTATUS                    : in  array_2D(THREAD_POOL_SIZE-1 downto 0)(1 downto 0);
+    MSTATUS                    : in  harc_vec_array(1 downto 0);
     harc_FETCH                 : in  natural range THREAD_POOL_SIZE-1 downto 0;
     harc_ID                    : in  natural range THREAD_POOL_SIZE-1 downto 0;
     pc_ID                      : in  std_logic_vector(31 downto 0);  -- pc_ID is PC entering ID stage
@@ -109,9 +109,9 @@ architecture DECODE of ID_STAGE is
   signal CSR_ADDR_IE               : std_logic_vector(11 downto 0);  -- debugging signals
 
   -- data dependency checker
-  signal valid_buf_lat             : array_2D(harc_range)(31 downto 0);  -- valid buffer for data dependency checker
-  signal valid_buf                 : array_2D(harc_range)(31 downto 0);  -- valid buffer for data dependency checker
-  signal valid_buf_wire            : array_2D(harc_range)(31 downto 0);  -- valid buffer for data dependency checker
+  signal valid_buf_lat             : harc_vec_array(31 downto 0);  -- valid buffer for data dependency checker
+  signal valid_buf                 : harc_vec_array(31 downto 0);  -- valid buffer for data dependency checker
+  signal valid_buf_wire            : harc_vec_array(31 downto 0);  -- valid buffer for data dependency checker
   signal rf_rs1_valid              : std_logic_vector(harc_range);
   signal rf_rs2_valid              : std_logic_vector(harc_range);
   signal rf_rd_read_valid          : std_logic_vector(harc_range);
@@ -133,7 +133,8 @@ architecture DECODE of ID_STAGE is
 
   -- Internal signals (VHDL1993)
   signal ls_parallel_exec_int             : std_logic;
-  signal instr_rvalid_ID_intt              : std_logic;
+  signal instr_rvalid_ID_intt             : std_logic;
+  signal instr_rvalid_ie_int              : std_logic;
 
   function rs1 (signal instr : in std_logic_vector(31 downto 0)) return integer is
   begin
@@ -178,6 +179,7 @@ begin
   -- Conection of internal signals to output ports (VHDL1993)
   ls_parallel_exec <= ls_parallel_exec_int;
   instr_rvalid_id_int <= instr_rvalid_id_intt;
+  instr_rvalid_ie <= instr_rvalid_ie_int;
 
   zero_rd_wire  <= '1' when rd(instr_word_ID) = 0 else '0';
 
@@ -200,7 +202,7 @@ begin
     if rst_ni = '0' then
       pc_IE               <= (others => '0');
       harc_EXEC           <=  0;
-      instr_rvalid_IE     <= '0';
+      instr_rvalid_ie_int     <= '0';
       ie_instr_req        <= '0';
       ls_instr_req        <= '0';
       comparator_en       <= '0';
@@ -209,7 +211,7 @@ begin
       ls_instr_req     <= '0';
       ie_instr_req     <= '0';
       WB_EN_next_ID    <= '0'; 
-      instr_rvalid_IE  <= '0';
+      instr_rvalid_ie_int  <= '0';
 
       if served_irq(harc_ID)   = '1'  or
          core_busy_IE                    = '1'  or 
@@ -224,7 +226,7 @@ begin
         zero_rd  <= zero_rd_wire;
         halt_IE  <= '0';
         halt_LSU <= '0';
-        instr_rvalid_IE  <= '1';
+        instr_rvalid_ie_int  <= '1';
         instr_word_IE  <= instr_word_ID;
         -- pc propagation
         pc_IE               <= pc_ID;
@@ -575,7 +577,7 @@ begin
     end if;  -- clk
   end process;
 
-  instr_rvalid_id_intt<= instr_rvalid_ID or instr_rvalid_ID_int_lat when instr_rvalid_IE = '0' else instr_rvalid_ID;
+  instr_rvalid_id_intt <= instr_rvalid_ID or instr_rvalid_ID_int_lat when instr_rvalid_ie_int = '0' else instr_rvalid_ID;
 
   process(clk_i, rst_ni)
   begin
@@ -607,12 +609,17 @@ begin
                         instr_word_ID, busy_LS, core_busy_IE, core_busy_LS, ls_parallel_exec_int, instr_rvalid_ID_intt
                        ) --VHDL1993
   variable OPCODE_wires  : std_logic_vector (6 downto 0);
-  variable parallel_execution : boolean;
+  variable parallel_execution_cond : boolean;
+
   begin
     OPCODE_wires  := OPCODE(instr_word_ID);
     -- parallelism enablers, halts the pipeline when it is zero. -------------------
-    parallel_execution := (OPCODE_wires = LOAD or OPCODE_wires = STORE or OPCODE_wires = AMO or OPCODE_wires = KMEM) and busy_LS = '1' and instr_rvalid_id_intt= '1';
-    ls_parallel_exec_int  <= '0' when parallel_execution else '1';
+    parallel_execution_cond := (OPCODE_wires = LOAD or OPCODE_wires = STORE or OPCODE_wires = AMO or OPCODE_wires = KMEM) and busy_LS = '1' and instr_rvalid_id_intt= '1';
+    if parallel_execution_cond then
+      ls_parallel_exec_int  <= '0';
+    else 
+      ls_parallel_exec_int  <= '1';
+    end if;
     busy_ID <= '0';  -- wait for a valid instruction or process the instruction 
     -- A data deoendency is only valid to make a stall when the current dependent instruction is not flushed 
     if core_busy_IE = '1' or core_busy_LS = '1' or ls_parallel_exec_int = '0' then
@@ -626,10 +633,17 @@ begin
                         instr_word_ID, busy_LS, core_busy_LS, core_busy_IE, ls_parallel_exec_int, instr_rvalid_ID_intt
                        ) --VHDL 1993
   variable OPCODE_wires  : std_logic_vector (6 downto 0);
+  variable parallel_execution_cond : boolean;
+
   begin
     OPCODE_wires      := OPCODE(instr_word_ID); 
+    parallel_execution_cond := busy_LS = '1' and instr_rvalid_id_intt= '1';
     busy_ID           <= '0';
-    ls_parallel_exec_int  <= '0' when busy_LS = '1' and instr_rvalid_id_intt= '1' else '1';
+    if parallel_execution_cond then
+      ls_parallel_exec_int  <= '0';
+    else
+      ls_parallel_exec_int <= '1';
+    end if;
     -- A data deoendency is only valid to make a stall when the current dependent instruction is not flushed
     if core_busy_IE = '1' or core_busy_LS = '1' or ls_parallel_exec_int = '0' then
       busy_ID <= '1';  -- wait for the stall to finish, block new instructions 

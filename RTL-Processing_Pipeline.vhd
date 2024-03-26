@@ -48,9 +48,9 @@ entity Pipeline is
     csr_instr_done             : in  std_logic;
     csr_access_denied_o        : in  std_logic;
     csr_rdata_o                : in  std_logic_vector (31 downto 0);
-    MHARTID                    : in  array_2d(THREAD_POOL_SIZE-1 downto 0)(9  downto 0);
-    MSTATUS                    : in  array_2d(THREAD_POOL_SIZE-1 downto 0)(1 downto 0);
-    PCER                       : in  array_2d(THREAD_POOL_SIZE-1 downto 0)(31 downto 0);
+    MHARTID                    : in  harc_vec_array(9  downto 0);
+    MSTATUS                    : in  harc_vec_array(1 downto 0);
+    PCER                       : in  harc_vec_array(31 downto 0);
     served_irq                 : out std_logic_vector(THREAD_POOL_SIZE-1 downto 0);
     served_pending_irq         : out std_logic_vector(THREAD_POOL_SIZE-1 downto 0);
     WFI_Instr                  : out std_logic;
@@ -86,7 +86,7 @@ entity Pipeline is
     ebreak_instr               : out std_logic;
     data_addr_internal         : out std_logic_vector(31 downto 0);
     absolute_jump              : out std_logic_vector(THREAD_POOL_SIZE-1 downto 0);
-    regfile                    : out array_3d(THREAD_POOL_SIZE-1 downto 0)(RF_SIZE-1 downto 0)(31 downto 0);
+    regfile                    : out regfile_array(31 downto 0);
     PC_offset_ID               : out std_logic_vector(31 downto 0);
     set_branch_condition_ID    : out std_logic;
     wfi_hart_wire              : in  std_logic_vector(THREAD_POOL_SIZE-1 downto 0);
@@ -239,14 +239,14 @@ architecture Pipe of Pipeline is
   signal rs2_valid_buf               : std_logic_vector(buf_size-1 downto 0);
   signal rd_read_only_valid_buf      : std_logic_vector(buf_size-1 downto 0);
   signal rd_valid_buf                : std_logic_vector(buf_size-1 downto 0);
-  signal Instr_word_buf              : array_2d(buf_size-1 downto 0)(31 downto 0);
-  signal pc_buf                      : array_2d(buf_size-1 downto 0)(31 downto 0);
+  signal Instr_word_buf              : fw_buffer(31 downto 0);
+  signal pc_buf                      : fw_buffer(31 downto 0);
   signal rs1_valid_buf_wire          : std_logic_vector(buf_size-1 downto 0);
   signal rs2_valid_buf_wire          : std_logic_vector(buf_size-1 downto 0);
   signal rd_valid_buf_wire           : std_logic_vector(buf_size-1 downto 0);
   signal rd_read_only_valid_buf_wire : std_logic_vector(buf_size-1 downto 0);
-  signal Instr_word_buf_wire         : array_2d(buf_size-1 downto 0)(31 downto 0);
-  signal pc_buf_wire                 : array_2d(buf_size-1 downto 0)(31 downto 0);
+  signal Instr_word_buf_wire         : fw_buffer(31 downto 0); --redefined for VHDL1993
+  signal pc_buf_wire                 : fw_buffer(31 downto 0);
   signal buf_wr_ptr                  : integer := 0;
   signal buf_wr_ptr_lat              : integer := 0;
 
@@ -281,7 +281,6 @@ architecture Pipe of Pipeline is
   signal RS2_Data_IE_int             : std_logic_vector(31 downto 0);
   signal RD_Data_IE_int              : std_logic_vector(31 downto 0);
   signal instr_word_IE_int           : std_logic_vector(31 downto 0);
-  signal instr_rvalid_ie_int         : std_logic;
   signal harc_exec_int               : natural range THREAD_POOL_SIZE-1 downto 0;
   signal ie_except_condition_int     : std_logic;
   signal ls_except_condition_int     : std_logic;
@@ -361,7 +360,7 @@ architecture Pipe of Pipeline is
     load_op                    : out std_logic;
     store_op                   : out std_logic;
     instr_word_IE              : out std_logic_vector(31 downto 0);
-    MSTATUS                    : in  array_2D(THREAD_POOL_SIZE-1 downto 0)(1 downto 0);
+    MSTATUS                    : in  harc_vec_array(1 downto 0);
     harc_ID                    : in  natural range THREAD_POOL_SIZE-1 downto 0;
     pc_ID                      : in  std_logic_vector(31 downto 0);  -- pc_ID is PC entering ID stage
     rs1_valid_ID               : in  std_logic;
@@ -503,8 +502,8 @@ architecture Pipe of Pipeline is
     pass_BGE                  : in  std_logic;
     pass_BGEU                 : in  std_logic;
     ie_instr_req              : in  std_logic;
-    MHARTID                   : in  array_2d(harc_range)(9 downto 0);
-    MSTATUS                   : in  array_2d(harc_range)(1 downto 0);
+    MHARTID                   : in  harc_vec_array(9 downto 0);
+    MSTATUS                   : in  harc_vec_array(1 downto 0);
     harc_EXEC                 : in  natural range THREAD_POOL_SIZE-1 downto 0;
     instr_rvalid_IE           : in  std_logic;  -- validity bit at IE input
     WB_EN_next_ID             : in  std_logic;
@@ -595,7 +594,7 @@ architecture Pipe of Pipeline is
     RS2_Data_IE                : out std_logic_vector(31 downto 0);
     RD_Data_IE                 : out std_logic_vector(31 downto 0);
     data_addr_internal_IE      : out std_logic_vector(31 downto 0);
-    regfile                    : out array_3d(harc_range)(RF_SIZE-1 downto 0)(31 downto 0)
+    regfile                    : out regfile_array(31 downto 0)
   );
   end component;
 

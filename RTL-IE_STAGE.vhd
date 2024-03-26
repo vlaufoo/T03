@@ -62,8 +62,8 @@ entity IE_STAGE is
     pass_BGE                  : in  std_logic;
     pass_BGEU                 : in  std_logic;
     ie_instr_req              : in  std_logic;
-    MHARTID                   : in  array_2d(THREAD_POOL_SIZE-1 downto 0)(9  downto 0);
-    MSTATUS                   : in  array_2D(THREAD_POOL_SIZE-1 downto 0)(1 downto 0);
+    MHARTID                   : in  harc_vec_array(9  downto 0);
+    MSTATUS                   : in  harc_vec_array(1 downto 0);
     harc_EXEC                 : in  integer range THREAD_POOL_SIZE-1 downto 0;
     instr_rvalid_IE           : in  std_logic;  -- validity bit at IE input
     WB_EN_next_ID             : in  std_logic;
@@ -415,9 +415,9 @@ begin
                   IE_WB  <= (others => '1');
                 elsif zero_rs1 = '1' then
                   IE_WB <= (others => '0');
-                elsif pass_BEQ then
+                elsif pass_BEQ = '1' then
                   IE_WB <= (31 downto 1 => '0') & '1';
-                elsif pass_BLTU then
+                elsif pass_BLTU = '1' then
                   IE_WB <= (others => '0');
                 else
                   IE_WB <= res(31 downto 0);
@@ -431,7 +431,7 @@ begin
                   IE_WB <= (others => '0');
             --    elsif abs(signed(RS1_DATA_IE)) < abs(signed(RS2_DATA_IE)) then
               --    IE_WB <= (others => '0');
-                elsif pass_BEQ then
+                elsif pass_BEQ = '1' then
                   if RS2_DATA_IE(31) = RS1_DATA_IE(31) then
                     IE_WB <= (31 downto 1 => '0') & '1';
                   else
@@ -451,9 +451,9 @@ begin
                   IE_WB <= RS1_Data_IE;
                 elsif zero_rs1 = '1' then
                   IE_WB <= (others => '0');
-                elsif pass_BEQ then
+                elsif pass_BEQ = '1' then
                   IE_WB <= (others => '0');
-                elsif pass_BLTU then
+                elsif pass_BLTU = '1' then
                   IE_WB <= RS1_Data_IE;
                 else
                   IE_WB <= res(63 downto 32);
@@ -465,7 +465,7 @@ begin
                   IE_WB <= RS1_Data_IE;
                 elsif zero_rs1 = '1' then
                   IE_WB <= (others => '0');
-                elsif pass_BEQ then
+                elsif pass_BEQ = '1' then
                   IE_WB <= (others => '0');
             --    elsif abs(signed(RS1_DATA_IE)) < abs(signed(RS2_DATA_IE)) then
               --    IE_WB <= RS1_Data_IE;
@@ -562,7 +562,12 @@ begin
     csr_addr_i                       <= (others => '0');
     IE_WB_EN_wire_int                <= (WB_EN_next_IE or (instr_rvalid_IE and WB_EN_next_ID  and not decoded_instruction_IE(MUL_bit_position))) and not served_irq_wires(harc_EXEC);
     --branch prediction signals
-    halt_update_IE_wire              <= halt_update_IE_pending and not instr_gnt_i; -- latch the halt wire as long as we don't have a valid instr
+    if instr_gnt_i = '0' then
+      halt_update_IE_wire              <= halt_update_IE_pending; -- latch the halt wire as long as we don't have a valid instr
+    else
+      halt_update_IE_wire              <= (others => '0'); -- latch the halt wire as long as we don't have a valid instr 
+    end if;
+
     branch_taken                     <= '0';
     source_hartid_o                  <= to_integer(unsigned(MHARTID(harc_EXEC)(THREAD_POOL_SIZE_GLOBAL-1 downto 0)));
 
