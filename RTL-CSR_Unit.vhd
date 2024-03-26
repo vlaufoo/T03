@@ -50,7 +50,7 @@ entity CSR_Unit is
     served_mret_condition       : in  std_logic_vector(THREAD_POOL_SIZE-1 downto 0);
     served_irq                  : in  std_logic_vector(THREAD_POOL_SIZE-1 downto 0);
     served_pending_irq          : in  std_logic_vector(THREAD_POOL_SIZE-1 downto 0);
-    pc_except_value_wire        : in  array_2d(THREAD_POOL_SIZE-1 downto 0)(31 downto 0);
+    pc_except_value_wire        : in  harc_vec_array(31 downto 0);
     data_addr_internal          : in  std_logic_vector(31 downto 0);
     jump_instr                  : in  std_logic;
     branch_instr                : in  std_logic;
@@ -64,13 +64,13 @@ entity CSR_Unit is
     csr_instr_done              : out std_logic;
     csr_access_denied_o         : out std_logic;
     csr_rdata_o                 : out std_logic_vector (31 downto 0);
-    MHARTID                     : out array_2d(THREAD_POOL_SIZE-1 downto 0)(9 downto 0);  -- AAA adjust the size of mhartID
-    MSTATUS                     : out array_2d(THREAD_POOL_SIZE-1 downto 0)(1 downto 0);
-    MEPC                        : out array_2d(THREAD_POOL_SIZE-1 downto 0)(31 downto 0);
-    MCAUSE                      : out array_2d(THREAD_POOL_SIZE-1 downto 0)(31 downto 0);
-    MIP                         : out array_2d(THREAD_POOL_SIZE-1 downto 0)(31 downto 0);
-    MTVEC                       : out array_2d(THREAD_POOL_SIZE-1 downto 0)(31 downto 0);
-    PCER                        : out array_2d(THREAD_POOL_SIZE-1 downto 0)(31 downto 0);
+    MHARTID                     : out harc_vec_array(9 downto 0);  -- AAA adjust the size of mhartID
+    MSTATUS                     : out harc_vec_array(1 downto 0);
+    MEPC                        : out harc_vec_array(31 downto 0);
+    MCAUSE                      : out harc_vec_array(31 downto 0);
+    MIP                         : out harc_vec_array(31 downto 0);
+    MTVEC                       : out harc_vec_array(31 downto 0);
+    PCER                        : out harc_vec_array(31 downto 0);
     fetch_enable_i              : in  std_logic;
     clk_i                       : in  std_logic;
     rst_ni                      : in  std_logic;
@@ -94,28 +94,28 @@ architecture CSR of CSR_Unit is
 
   subtype harc_range is natural range THREAD_POOL_SIZE-1 downto 0;
 
-  signal pc_IE_replicated : array_2d(harc_range)(31 downto 0);	
+  signal pc_IE_replicated : harc_vec_array(31 downto 0);	
 	
   -- Control Status Register (CSR) signals 
-  signal PCCRs       : array_2d(harc_range)(31 downto 0);  -- still not implemented
-  signal PCMR        : array_2d(harc_range)(31 downto 0);  -- still not implemented
-  signal MESTATUS    : array_2d(harc_range)(2  downto 0);
-  signal MCPUID      : array_2d(harc_range)(8  downto 0);
-  signal MIMPID      : array_2d(harc_range)(15 downto 0);
-  signal MIRQ        : array_2d(harc_range)(31 downto 0);  -- extension, maps external irqs
-  signal MBADADDR    : array_2d(harc_range)(31 downto 0);  -- misaligned address containers
+  signal PCCRs       : harc_vec_array(31 downto 0);  -- still not implemented
+  signal PCMR        : harc_vec_array(31 downto 0);  -- still not implemented
+  signal MESTATUS    : harc_vec_array(2  downto 0);
+  signal MCPUID      : harc_vec_array(8  downto 0);
+  signal MIMPID      : harc_vec_array(15 downto 0);
+  signal MIRQ        : harc_vec_array(31 downto 0);  -- extension, maps external irqs
+  signal MBADADDR    : harc_vec_array(31 downto 0);  -- misaligned address containers
 
-  signal MCYCLE        : array_2d(harc_range)(31 downto 0);
-  signal MINSTRET      : array_2d(harc_range)(31 downto 0);
-  signal MHPMCOUNTER3  : array_2d(harc_range)(31 downto 0);
-  signal MHPMCOUNTER6  : array_2d(harc_range)(31 downto 0);
-  signal MHPMCOUNTER7  : array_2d(harc_range)(31 downto 0);
-  signal MHPMCOUNTER8  : array_2d(harc_range)(31 downto 0);
-  signal MHPMCOUNTER9  : array_2d(harc_range)(31 downto 0);
-  signal MHPMCOUNTER10 : array_2d(harc_range)(31 downto 0);
-  signal MHPMCOUNTER11 : array_2d(harc_range)(31 downto 0);
-  signal MCYCLEH       : array_2d(harc_range)(31 downto 0);
-  signal MINSTRETH     : array_2d(harc_range)(31 downto 0);
+  signal MCYCLE        : harc_vec_array(31 downto 0);
+  signal MINSTRET      : harc_vec_array(31 downto 0);
+  signal MHPMCOUNTER3  : harc_vec_array(31 downto 0);
+  signal MHPMCOUNTER6  : harc_vec_array(31 downto 0);
+  signal MHPMCOUNTER7  : harc_vec_array(31 downto 0);
+  signal MHPMCOUNTER8  : harc_vec_array(31 downto 0);
+  signal MHPMCOUNTER9  : harc_vec_array(31 downto 0);
+  signal MHPMCOUNTER10 : harc_vec_array(31 downto 0);
+  signal MHPMCOUNTER11 : harc_vec_array(31 downto 0);
+  signal MCYCLEH       : harc_vec_array(31 downto 0);
+  signal MINSTRETH     : harc_vec_array(31 downto 0);
   signal MHPMEVENT3    : std_logic_vector(harc_range);       
   signal MHPMEVENT6    : std_logic_vector(harc_range);
   signal MHPMEVENT7    : std_logic_vector(harc_range);
@@ -133,14 +133,14 @@ architecture CSR of CSR_Unit is
   signal csr_instr_req_replicated       : std_logic_vector(harc_range);
   signal csr_instr_done_replicated      : std_logic_vector(harc_range);
   signal csr_access_denied_o_replicated : std_logic_vector(harc_range);
-  signal csr_rdata_o_replicated         : array_2d(harc_range)(31 downto 0);
+  signal csr_rdata_o_replicated         : harc_vec_array(31 downto 0);
 
   -- wire only signals (For Synopsis Comaptibility)
-  signal MSTATUS_internal       : array_2d(harc_range)(1 downto 0);
-  signal MEPC_internal          : array_2d(harc_range)(31 downto 0);
-  signal MCAUSE_internal        : array_2d(harc_range)(31 downto 0);
-  signal MIP_internal           : array_2d(harc_range)(31 downto 0);
-  signal MTVEC_internal         : array_2d(harc_range)(31 downto 0);
+  signal MSTATUS_internal       : harc_vec_array(1 downto 0);
+  signal MEPC_internal          : harc_vec_array(31 downto 0);
+  signal MCAUSE_internal        : harc_vec_array(31 downto 0);
+  signal MIP_internal           : harc_vec_array(31 downto 0);
+  signal MTVEC_internal         : harc_vec_array(31 downto 0);
   signal irq_ack_o_internal     : std_logic;
   signal trap_hndlr             : std_logic_vector(harc_range);
 
@@ -153,8 +153,8 @@ architecture CSR of CSR_Unit is
 
   -- Internal signals (VHDL1993)
 
-  signal PCER_int               : array_2d(THREAD_POOL_SIZE-1 downto 0)(31 downto 0);
-  signal MHARTID_int            : array_2d(THREAD_POOL_SIZE-1 downto 0)(9 downto 0); 
+  signal PCER_int               : harc_vec_array(31 downto 0);
+  signal MHARTID_int            : harc_vec_array(9 downto 0); 
 
   function rs1 (signal instr : in std_logic_vector(31 downto 0)) return integer is
   begin

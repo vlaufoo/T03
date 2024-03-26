@@ -67,7 +67,7 @@ entity REGISTERFILE is
     RS2_Data_IE             : out std_logic_vector(31 downto 0);
     RD_Data_IE              : out std_logic_vector(31 downto 0);
     data_addr_internal_IE   : out std_logic_vector(31 downto 0);
-    regfile                 : out array_3d(THREAD_POOL_SIZE-1 downto 0)(RF_SIZE-1 downto 0)(31 downto 0)
+    regfile                 : out regfile_array(31 downto 0)
     );
 end entity;  ------------------------------------------
 
@@ -76,15 +76,19 @@ end entity;  ------------------------------------------
 architecture RF of REGISTERFILE is
 
   subtype harc_range is natural range THREAD_POOL_SIZE - 1 downto 0;
+  subtype lutram_array is array_2d((THREAD_POOL_SIZE*RF_SIZE)-1 downto 0);
 
   signal RF_res          : std_logic_vector(31 downto 0);
   signal WB_EN_lat       : std_logic;
   signal harc_LAT        : harc_range;
   signal instr_word_LAT  : std_logic_vector(31 downto 0);
 
-  signal regfile_lutram_rs1 : array_2d((THREAD_POOL_SIZE*RF_SIZE)-1 downto 0)(31 downto 0);
-  signal regfile_lutram_rs2 : array_2d((THREAD_POOL_SIZE*RF_SIZE)-1 downto 0)(31 downto 0);
-  signal regfile_lutram_rd  : array_2d((THREAD_POOL_SIZE*RF_SIZE)-1 downto 0)(31 downto 0);
+ -- signal regfile_lutram_rs1 : array_2d((THREAD_POOL_SIZE*RF_SIZE)-1 downto 0)(31 downto 0);
+ -- signal regfile_lutram_rs2 : array_2d((THREAD_POOL_SIZE*RF_SIZE)-1 downto 0)(31 downto 0);
+ -- signal regfile_lutram_rd  : array_2d((THREAD_POOL_SIZE*RF_SIZE)-1 downto 0)(31 downto 0);
+  signal regfile_lutram_rs1 : lutram_array(31 downto 0);
+  signal regfile_lutram_rs2 : lutram_array(31 downto 0);
+  signal regfile_lutram_rd  : lutram_array(31 downto 0);
 
   attribute ram_style : string;
   attribute ram_style of RS1_Data_IE        : signal is "reg"; -- AAA i think these are unecessary and need to be removed
@@ -108,6 +112,8 @@ architecture RF of REGISTERFILE is
   signal harc_WB                : harc_range;
   signal instr_word_WB          : std_logic_vector(31 downto 0);
 
+  signal regfile_int             : regfile_array(31 downto 0);
+
   function rs1 (signal instr : in std_logic_vector(31 downto 0)) return integer is
   begin
     return to_integer(unsigned(instr(15+(RF_CEIL-1) downto 15)));
@@ -125,7 +131,6 @@ architecture RF of REGISTERFILE is
 
 begin
 
-
   ------------------------------------------------------------
   --  ██████╗ ███████╗ ██████╗ ███████╗██╗██╗     ███████╗  --
   --  ██╔══██╗██╔════╝██╔════╝ ██╔════╝██║██║     ██╔════╝  --
@@ -134,6 +139,10 @@ begin
   --  ██║  ██║███████╗╚██████╔╝██║     ██║███████╗███████╗  --
   --  ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═╝     ╚═╝╚══════╝╚══════╝  --
   ------------------------------------------------------------
+
+  -- Connecting internal signals to ports
+
+  regfile <= regfile_int;
 
   RF_FF : if lutram_rf = 0 generate
 
@@ -145,10 +154,10 @@ begin
   -- synch single state process
   begin
       for h in harc_range loop
-        regfile(h)(0) <= (others => '0');
+        regfile_int(h)(0) <= (others => '0');
       end loop;
       if WB_EN_lat = '1' then
-        regfile(harc_LAT)(rd(instr_word_LAT)) <= RF_res;
+        regfile_int(harc_LAT)(rd(instr_word_LAT)) <= RF_res;
       end if;
   end process;
 
@@ -162,12 +171,12 @@ begin
     if rst_ni = '0' then
       for h in harc_range loop
         if latch_rf = 0 then
-          regfile(h)(0) <= (others => '0');
+          regfile_int(h)(0) <= (others => '0');
         end if;
       end loop;
     elsif rising_edge(clk_i) then
       if WB_EN = '1' then
-        regfile(harc_WB)(rd(instr_word_WB)) <= WB_RD;
+        regfile_int(harc_WB)(rd(instr_word_WB)) <= WB_RD;
       end if;
     end if;  -- clk
   end process;
@@ -189,14 +198,14 @@ begin
       elsif instr_rvalid_ID_int = '0' then -- wait for a valid instruction
       else  -- process the incoming instruction 
 
-        data_addr_internal_IE <= std_logic_vector(signed(regfile(harc_ID)(rs1(instr_word_ID))) + signed(S_immediate(instr_word_ID)));
+        data_addr_internal_IE <= std_logic_vector(signed(regfile_int(harc_ID)(rs1(instr_word_ID))) + signed(S_immediate(instr_word_ID)));
 
         ----- REGISTERFILE READ IS DONE HERE --------------------------------------------------------------------------------------------------------------
          RS1_Data_IE <= RS1_Data_IE_wire; 
          RS2_Data_IE <= RS2_Data_IE_wire; 
 
        -- pragma translate_off
-        RD_Data_IE  <= regfile(harc_ID)(rd(instr_word_ID)); -- reading the 'rd' data here is only for debugging purposes if the acclerator is disabled
+        RD_Data_IE  <= regfile_int(harc_ID)(rd(instr_word_ID)); -- reading the 'rd' data here is only for debugging purposes if the acclerator is disabled
         RS1_Addr_IE <= std_logic_vector(to_unsigned(rs1(instr_word_ID), 5)); -- debugging signals
         RS2_Addr_IE <= std_logic_vector(to_unsigned(rs2(instr_word_ID), 5)); -- debugging signals
         RD_Addr_IE  <= std_logic_vector(to_unsigned(rd(instr_word_ID), 5)); -- debugging signals
@@ -211,9 +220,9 @@ begin
     end if;  -- clk
   end process;
 
-  RS1_Data_IE_wire <= regfile(harc_ID)(rs1(instr_word_ID)); 
-  RS2_Data_IE_wire <= regfile(harc_ID)(rs2(instr_word_ID));
-  RD_Data_IE_wire  <= regfile(harc_ID)(rd(instr_word_ID));
+  RS1_Data_IE_wire <= regfile_int(harc_ID)(rs1(instr_word_ID)); 
+  RS2_Data_IE_wire <= regfile_int(harc_ID)(rs2(instr_word_ID));
+  RD_Data_IE_wire  <= regfile_int(harc_ID)(rd(instr_word_ID));
 
   end generate; -- lutram_rf = 0
 
@@ -221,7 +230,7 @@ begin
 
   RF_RD_EN : process(
                       core_busy_IE, core_busy_LS, ls_parallel_exec, instr_rvalid_ID_int, instr_word_ID, regfile_lutram_rs1,
-                      regfile_lutram_res2
+                      regfile_lutram_rs2
                     )  --VHDL1993
   -- synch single state process
   begin

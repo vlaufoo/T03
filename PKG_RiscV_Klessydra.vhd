@@ -41,17 +41,6 @@ package riscv_klessydra is
 --   ╚═════╝ ╚═════╝ ╚══════╝   ╚═╝    ╚═════╝ ╚═╝     ╚═╝       ╚═╝      ╚═╝   ╚═╝     ╚══════╝╚══════╝  --
 ------------------------------------------------------------------------------------------------------------
 
-  type array_2d     is array (integer range<>) of std_logic_vector;
-  type array_3d     is array (integer range<>) of array_2d;
-  type array_2d_int is array (integer range<>) of integer;
-  type array_2d_nat is array (integer range<>) of natural;
-
-  type fsm_IE_states is (sleep, normal, csr_instr_wait_state);
-  type mulh_states   is (init, mult, accum);
-  type mul_states    is (mult, accum);
-  type div_states    is (init, divide);
-  type fsm_LS_states is (normal , data_valid_waiting);
-
   -- The DSP unit states are defined here
   constant dsp_init                : std_logic_vector(1 downto 0) := "00";
   constant dsp_halt_hart           : std_logic_vector(1 downto 0) := "01";
@@ -61,12 +50,34 @@ package riscv_klessydra is
   constant THREAD_ID_SIZE          : integer := 4;
   constant NOP_POOL_SIZE           : integer := 2;
   constant BRANCHING_DELAY_SLOT    : integer := 3;
+  constant RF_SIZE                 : natural := 32;
   --constant HARC_SIZE               : integer := THREAD_POOL_SIZE;
 
   constant SLEEP_MODE              : natural := 0;
   constant SINGLE_HART_MODE        : natural := 1;
   constant DUAL_HART_MODE          : natural := 2;
   constant IMT_MODE                : natural := THREAD_POOL_BASELINE;
+
+  type array_2d     is array (integer range<>) of std_logic_vector;
+  type array_3d     is array (integer range<>) of array_2d;
+  type array_2d_int is array (integer range<>) of integer;
+  type array_2d_nat is array (integer range<>) of natural;
+
+  -- Applicaiton specific types (VHDL1993)
+  type harc_vec_array  is array (natural range THREAD_POOL_BASELINE-1 downto 0) of std_logic_vector;
+  type harc_array      is array (natural range THREAD_POOL_BASELINE-1 downto 0) of std_logic;
+  type harc_array_int  is array (natural range THREAD_POOL_BASELINE-1 downto 0) of integer;
+  type harc_array_nat  is array (natural range THREAD_POOL_BASELINE-1 downto 0) of natural;
+
+  type regfile_unit    is array (natural range RF_SIZE-1 downto 0) of std_logic_vector;
+  type regfile_array   is array (natural range THREAD_POOL_BASELINE-1 downto 0) of regfile_unit;
+
+  type fsm_IE_states is (sleep, normal, csr_instr_wait_state);
+  type mulh_states   is (init, mult, accum);
+  type mul_states    is (mult, accum);
+  type div_states    is (init, divide);
+  type fsm_LS_states is (normal , data_valid_waiting);
+
 
 -------------------------------------------------------------------------------------------------
 --  ███████╗██╗  ██╗███████╗ ██████╗    ██████╗ ███████╗███████╗██╗███╗   ██╗███████╗███████╗  --
